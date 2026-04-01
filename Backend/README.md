@@ -115,3 +115,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 - MediaPipe is pinned to 0.10.14 for Pose compatibility.
 - Uploaded image bytes are processed in-memory and discarded after inference.
 - Profile and scan history are persisted in SQLite at model_artifacts/profile_store.db.
+
+
+Frontend - npm run dev
+backend - python -m uvicorn main:app --reload

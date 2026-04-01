@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from routes.analyze import router as analyze_router
+from routes.auth import router as auth_router
 from routes.catalog import router as catalog_router
 from routes.performance import router as performance_router
 from routes.privacy import router as privacy_router
@@ -32,6 +33,7 @@ app.add_middleware(
 )
 
 app.include_router(analyze_router)
+app.include_router(auth_router)
 app.include_router(quality_router)
 app.include_router(performance_router)
 app.include_router(catalog_router)

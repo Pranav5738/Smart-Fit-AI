@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { registerAuthUser, signInAuthUser } from '@/services/api';
 
 interface AuthUser {
   id: string;
@@ -13,10 +14,8 @@ interface AuthUser {
   email: string;
   heightCm?: number;
   weightKg?: number;
-}
-
-interface StoredUser extends AuthUser {
-  password: string;
+  createdAt?: string;
+  lastLoginAt?: string;
 }
 
 interface RegisterPayload {
@@ -30,44 +29,19 @@ interface RegisterPayload {
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string, rememberMe?: boolean) => void;
-  register: (payload: RegisterPayload) => void;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<void>;
   signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  users: 'smartfit-auth-users',
   persistentSession: 'smartfit-auth-session',
   session: 'smartfit-auth-session-storage',
 };
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
-
-const readUsers = (): StoredUser[] => {
-  const raw = localStorage.getItem(STORAGE_KEYS.users);
-
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as StoredUser[];
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed;
-  } catch {
-    return [];
-  }
-};
-
-const writeUsers = (users: StoredUser[]) => {
-  localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
-};
 
 const restoreSession = (): AuthUser | null => {
   const raw =
@@ -89,18 +63,14 @@ const restoreSession = (): AuthUser | null => {
       id: parsed.id,
       name: parsed.name,
       email: parsed.email,
+      heightCm: parsed.heightCm,
+      weightKg: parsed.weightKg,
+      createdAt: parsed.createdAt,
+      lastLoginAt: parsed.lastLoginAt,
     };
   } catch {
     return null;
   }
-};
-
-const generateUserId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return `user-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 };
 
 const persistSession = (user: AuthUser, rememberMe: boolean) => {
@@ -122,7 +92,7 @@ const clearSession = () => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(restoreSession);
 
-  const register = useCallback((payload: RegisterPayload) => {
+  const register = useCallback(async (payload: RegisterPayload) => {
     const trimmedName = payload.name.trim();
     const normalizedEmail = normalizeEmail(payload.email);
     const trimmedPassword = payload.password.trim();
@@ -147,36 +117,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error('Weight must be greater than 0.');
     }
 
-    const users = readUsers();
-
-    if (users.some((existingUser) => normalizeEmail(existingUser.email) === normalizedEmail)) {
-      throw new Error('An account already exists with this email.');
-    }
-
-    const newUser: StoredUser = {
-      id: generateUserId(),
+    const createdUser = await registerAuthUser({
       name: trimmedName,
       email: normalizedEmail,
       password: trimmedPassword,
       heightCm: payload.heightCm,
       weightKg: payload.weightKg,
-    };
-
-    writeUsers([newUser, ...users]);
+    });
 
     const nextUser: AuthUser = {
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      heightCm: newUser.heightCm,
-      weightKg: newUser.weightKg,
+      id: createdUser.id,
+      name: createdUser.name,
+      email: createdUser.email,
+      heightCm: createdUser.heightCm,
+      weightKg: createdUser.weightKg,
+      createdAt: createdUser.createdAt,
+      lastLoginAt: createdUser.lastLoginAt,
     };
 
     setUser(nextUser);
     persistSession(nextUser, true);
   }, []);
 
-  const signIn = useCallback((email: string, password: string, rememberMe = false) => {
+  const signIn = useCallback(async (email: string, password: string, rememberMe = false) => {
     const normalizedEmail = normalizeEmail(email);
     const trimmedPassword = password.trim();
 
@@ -184,23 +147,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error('Email and password are required.');
     }
 
-    const users = readUsers();
-    const matchedUser = users.find(
-      (existingUser) =>
-        normalizeEmail(existingUser.email) === normalizedEmail &&
-        existingUser.password === trimmedPassword
-    );
-
-    if (!matchedUser) {
-      throw new Error('Invalid email or password.');
-    }
+    const authenticatedUser = await signInAuthUser(normalizedEmail, trimmedPassword);
 
     const nextUser: AuthUser = {
-      id: matchedUser.id,
-      name: matchedUser.name,
-      email: matchedUser.email,
-      heightCm: matchedUser.heightCm,
-      weightKg: matchedUser.weightKg,
+      id: authenticatedUser.id,
+      name: authenticatedUser.name,
+      email: authenticatedUser.email,
+      heightCm: authenticatedUser.heightCm,
+      weightKg: authenticatedUser.weightKg,
+      createdAt: authenticatedUser.createdAt,
+      lastLoginAt: authenticatedUser.lastLoginAt,
     };
 
     setUser(nextUser);

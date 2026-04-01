@@ -31,13 +31,13 @@ export const AuthLandingPage = () => {
     []
   );
 
-  const handleSignIn = (event: FormEvent<HTMLFormElement>) => {
+  const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setErrorMessage(null);
 
     try {
-      signIn(signinEmail, signinPassword, rememberMe);
+      await signIn(signinEmail, signinPassword, rememberMe);
       notify('Signed in successfully.', 'success');
       navigate('/dashboard');
     } catch (error) {
@@ -49,7 +49,7 @@ export const AuthLandingPage = () => {
     }
   };
 
-  const handleRegister = (event: FormEvent<HTMLFormElement>) => {
+  const handleRegister = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (registerPassword !== registerConfirmPassword) {
@@ -63,7 +63,7 @@ export const AuthLandingPage = () => {
     setErrorMessage(null);
 
     try {
-      register({
+      await register({
         name: registerName,
         email: registerEmail,
         password: registerPassword,
@@ -80,29 +80,29 @@ export const AuthLandingPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#05091b] px-4 pb-8 pt-6 text-slate-100 sm:px-6 lg:px-10">
-      <div className="pointer-events-none absolute inset-0 -z-20 bg-[radial-gradient(ellipse_at_top_left,rgba(56,189,248,0.28),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(37,99,235,0.22),transparent_50%),linear-gradient(140deg,#040816_0%,#070f28_46%,#0b1d45_100%)]" />
-      <div className="pointer-events-none absolute inset-0 -z-10 opacity-70 [background-image:radial-gradient(rgba(191,219,254,0.6)_1px,transparent_1px)] [background-size:24px_24px]" />
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 px-4 pb-8 pt-6 text-slate-900 dark:bg-[#05091b] dark:text-slate-100 sm:px-6 lg:px-10">
+      <div className="pointer-events-none absolute inset-0 -z-20 bg-[radial-gradient(ellipse_at_top_left,rgba(125,211,252,0.34),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(96,165,250,0.22),transparent_50%),linear-gradient(140deg,#eff6ff_0%,#f8fafc_46%,#e2e8f0_100%)] dark:bg-[radial-gradient(ellipse_at_top_left,rgba(56,189,248,0.28),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(37,99,235,0.22),transparent_50%),linear-gradient(140deg,#040816_0%,#070f28_46%,#0b1d45_100%)]" />
+      <div className="pointer-events-none absolute inset-0 -z-10 opacity-40 [background-image:radial-gradient(rgba(71,85,105,0.24)_1px,transparent_1px)] [background-size:24px_24px] dark:opacity-70 dark:[background-image:radial-gradient(rgba(191,219,254,0.6)_1px,transparent_1px)]" />
 
-      <header className="mx-auto w-full max-w-7xl rounded-2xl border border-sky-300/30 bg-slate-950/55 p-2 shadow-[0_0_0_1px_rgba(59,130,246,0.18),0_20px_70px_rgba(10,26,70,0.55)] backdrop-blur-xl">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700/70 bg-slate-900/60 px-4 py-2.5">
+      <header className="mx-auto w-full max-w-7xl rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-card backdrop-blur-xl dark:border-sky-300/30 dark:bg-slate-950/55 dark:shadow-[0_0_0_1px_rgba(59,130,246,0.18),0_20px_70px_rgba(10,26,70,0.55)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/70 px-4 py-2.5 dark:border-slate-700/70 dark:bg-slate-900/60">
           <div className="flex items-center gap-3">
             <img
               src="/smartfit-logo-mark.svg"
               alt="SmartFit AI"
               className="h-9 w-9 rounded-xl border border-sky-200/60 object-cover shadow-soft dark:border-sky-700/40"
             />
-            <p className="text-2xl font-bold tracking-tight text-slate-100">SmartFit AI</p>
+            <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">SmartFit AI</p>
           </div>
 
-          <nav className="hidden items-center gap-8 text-base text-slate-300 lg:flex">
-            <a href="#features" className="transition hover:text-white">
+          <nav className="hidden items-center gap-8 text-base text-slate-600 lg:flex dark:text-slate-300">
+            <a href="#features" className="transition hover:text-slate-900 dark:hover:text-white">
               Features
             </a>
-            <Link to="/showcase" className="transition hover:text-white">
+            <Link to="/showcase" className="transition hover:text-slate-900 dark:hover:text-white">
               Showcase
             </Link>
-            <a href="#how-it-works" className="transition hover:text-white">
+            <a href="#how-it-works" className="transition hover:text-slate-900 dark:hover:text-white">
               How It Works
             </a>
           </nav>
@@ -110,14 +110,14 @@ export const AuthLandingPage = () => {
           <div className="flex items-center gap-2.5">
             <Link
               to="/showcase"
-              className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-sky-300 transition hover:bg-white/5 sm:inline-flex"
+              className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-slate-100 dark:text-sky-300 dark:hover:bg-white/5 sm:inline-flex"
             >
               Explore Live Demo
             </Link>
             <button
               type="button"
               onClick={() => setMode('signin')}
-              className="focus-ring rounded-xl border border-sky-300/40 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className="focus-ring rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 dark:border-sky-300/40 dark:bg-slate-900/70 dark:text-white dark:hover:bg-slate-800"
             >
               Sign In
             </button>
@@ -134,22 +134,22 @@ export const AuthLandingPage = () => {
           className="space-y-6"
         >
           <div>
-            <h1 className="text-balance text-5xl font-black leading-[1.04] text-white sm:text-6xl lg:text-7xl">
+            <h1 className="text-balance text-5xl font-black leading-[1.04] text-slate-900 dark:text-white sm:text-6xl lg:text-7xl">
               Find Your Perfect Fit
               <br />
-              <span className="bg-gradient-to-r from-cyan-300 via-sky-300 to-blue-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-600 via-brand-600 to-blue-700 bg-clip-text text-transparent dark:from-cyan-300 dark:via-sky-300 dark:to-blue-300">
                 Powered by AI Intelligence
               </span>
             </h1>
-            <p className="mt-6 max-w-3xl text-lg leading-relaxed text-slate-300">
+            <p className="mt-6 max-w-3xl text-lg leading-relaxed text-slate-600 dark:text-slate-300">
               Start your fit journey securely and explore how SmartFit AI transforms a single image into personalized size recommendations with cutting-edge AI intelligence, virtual try-on capabilities, and brand-specific mappings.
             </p>
           </div>
 
           <ul id="features" className="grid gap-3 text-2xl font-medium sm:grid-cols-2">
             {featureItems.map((item) => (
-              <li key={item} className="flex items-center gap-3 text-slate-100">
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-sky-500/25 text-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.3)]">
+              <li key={item} className="flex items-center gap-3 text-slate-900 dark:text-slate-100">
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-sky-100 text-brand-700 shadow-[0_0_0_1px_rgba(14,116,144,0.2)] dark:bg-sky-500/25 dark:text-sky-300 dark:shadow-[0_0_20px_rgba(56,189,248,0.3)]">
                   ✓
                 </span>
                 <span>{item}</span>
@@ -165,9 +165,9 @@ export const AuthLandingPage = () => {
           transition={{ duration: 0.55, delay: 0.08 }}
           className="relative"
         >
-          <div className="absolute -inset-0.5 -z-10 rounded-[2rem] bg-[linear-gradient(135deg,rgba(34,211,238,0.6),rgba(59,130,246,0.45),rgba(14,165,233,0.38))] blur-md" />
-          <div className="rounded-[2rem] border border-sky-300/40 bg-[linear-gradient(170deg,rgba(10,18,44,0.88),rgba(17,25,58,0.82)_58%,rgba(10,28,74,0.9))] p-6 shadow-[0_25px_90px_rgba(41,76,173,0.45)] backdrop-blur-xl sm:p-7">
-            <div className="grid grid-cols-2 rounded-xl border border-slate-700 bg-slate-900/70 p-1">
+          <div className="absolute -inset-0.5 -z-10 rounded-[2rem] bg-[linear-gradient(135deg,rgba(34,211,238,0.3),rgba(59,130,246,0.24),rgba(14,165,233,0.2))] blur-md dark:bg-[linear-gradient(135deg,rgba(34,211,238,0.6),rgba(59,130,246,0.45),rgba(14,165,233,0.38))]" />
+          <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur-xl dark:border-sky-300/40 dark:bg-[linear-gradient(170deg,rgba(10,18,44,0.88),rgba(17,25,58,0.82)_58%,rgba(10,28,74,0.9))] dark:shadow-[0_25px_90px_rgba(41,76,173,0.45)] sm:p-7">
+            <div className="grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/70">
               <button
                 type="button"
                 onClick={() => {
@@ -176,8 +176,8 @@ export const AuthLandingPage = () => {
                 }}
                 className={`focus-ring rounded-lg px-3 py-2.5 text-base font-semibold transition ${
                   mode === 'signin'
-                    ? 'bg-gradient-to-r from-cyan-500/80 to-blue-500/80 text-white shadow-[0_0_22px_rgba(56,189,248,0.35)]'
-                    : 'text-slate-300 hover:bg-white/5'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_22px_rgba(56,189,248,0.35)]'
+                    : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/5'
                 }`}
               >
                 Sign In
@@ -190,16 +190,16 @@ export const AuthLandingPage = () => {
                 }}
                 className={`focus-ring rounded-lg px-3 py-2.5 text-base font-semibold transition ${
                   mode === 'register'
-                    ? 'bg-gradient-to-r from-sky-500/80 to-blue-500/80 text-white shadow-[0_0_22px_rgba(59,130,246,0.35)]'
-                    : 'text-slate-300 hover:bg-white/5'
+                    ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-[0_0_22px_rgba(59,130,246,0.35)]'
+                    : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/5'
                 }`}
               >
                 Register
               </button>
             </div>
 
-            <h2 className="mt-6 text-4xl font-extrabold text-white">Access SmartFit AI</h2>
-            <p className="mt-2 text-base text-slate-300">
+            <h2 className="mt-6 text-4xl font-extrabold text-slate-900 dark:text-white">Access SmartFit AI</h2>
+            <p className="mt-2 text-base text-slate-600 dark:text-slate-300">
               {mode === 'signin'
                 ? 'Sign in to access your dashboard and personalize your fit journey.'
                 : 'Create an account to start your personalized fit intelligence journey.'}
@@ -213,7 +213,7 @@ export const AuthLandingPage = () => {
                   value={signinEmail}
                   onChange={(event) => setSigninEmail(event.target.value)}
                   placeholder="Email"
-                  className="focus-ring w-full rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-3 text-base text-white placeholder:text-slate-400"
+                  className="focus-ring w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950/70 dark:text-white"
                   required
                 />
                 <input
@@ -222,31 +222,31 @@ export const AuthLandingPage = () => {
                   value={signinPassword}
                   onChange={(event) => setSigninPassword(event.target.value)}
                   placeholder="Password"
-                  className="focus-ring w-full rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-3 text-base text-white placeholder:text-slate-400"
+                  className="focus-ring w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950/70 dark:text-white"
                   required
                 />
 
                 <div className="flex items-center justify-between gap-3 text-base">
-                  <label className="inline-flex items-center gap-2 text-slate-300">
+                  <label className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-300">
                     <input
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(event) => setRememberMe(event.target.checked)}
-                      className="h-4 w-4 rounded border-slate-500 bg-slate-900"
+                      className="h-4 w-4 rounded border-slate-300 bg-white dark:border-slate-500 dark:bg-slate-900"
                     />
                     <span>Remember me</span>
                   </label>
                   <button
                     type="button"
                     onClick={() => notify('Forgot password can be connected to backend reset flow.', 'info')}
-                    className="text-slate-300 underline-offset-4 transition hover:text-white hover:underline"
+                    className="text-slate-600 underline-offset-4 transition hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
                   >
                     Forgot password?
                   </button>
                 </div>
 
                 {errorMessage ? (
-                  <p className="rounded-xl border border-rose-400/35 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-400/35 dark:bg-rose-950/40 dark:text-rose-200">
                     {errorMessage}
                   </p>
                 ) : null}
@@ -259,7 +259,7 @@ export const AuthLandingPage = () => {
                   {isSubmitting ? 'Signing In...' : 'Sign In'}
                 </button>
 
-                <p className="pt-1 text-base text-slate-300">
+                <p className="pt-1 text-base text-slate-600 dark:text-slate-300">
                   New here?{' '}
                   <button
                     type="button"
@@ -267,7 +267,7 @@ export const AuthLandingPage = () => {
                       setMode('register');
                       setErrorMessage(null);
                     }}
-                    className="font-semibold text-sky-300 underline-offset-4 hover:underline"
+                    className="font-semibold text-brand-700 underline-offset-4 hover:underline dark:text-sky-300"
                   >
                     Create an account
                   </button>
@@ -281,7 +281,7 @@ export const AuthLandingPage = () => {
                   value={registerName}
                   onChange={(event) => setRegisterName(event.target.value)}
                   placeholder="Full Name"
-                  className="focus-ring w-full rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-3 text-base text-white placeholder:text-slate-400"
+                  className="focus-ring w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950/70 dark:text-white"
                   required
                 />
                 <input
@@ -290,7 +290,7 @@ export const AuthLandingPage = () => {
                   value={registerEmail}
                   onChange={(event) => setRegisterEmail(event.target.value)}
                   placeholder="Email"
-                  className="focus-ring w-full rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-3 text-base text-white placeholder:text-slate-400"
+                  className="focus-ring w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950/70 dark:text-white"
                   required
                 />
                 <input
@@ -299,7 +299,7 @@ export const AuthLandingPage = () => {
                   value={registerPassword}
                   onChange={(event) => setRegisterPassword(event.target.value)}
                   placeholder="Password"
-                  className="focus-ring w-full rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-3 text-base text-white placeholder:text-slate-400"
+                  className="focus-ring w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950/70 dark:text-white"
                   required
                 />
                 <input
@@ -308,12 +308,12 @@ export const AuthLandingPage = () => {
                   value={registerConfirmPassword}
                   onChange={(event) => setRegisterConfirmPassword(event.target.value)}
                   placeholder="Confirm Password"
-                  className="focus-ring w-full rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-3 text-base text-white placeholder:text-slate-400"
+                  className="focus-ring w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950/70 dark:text-white"
                   required
                 />
 
                 {errorMessage ? (
-                  <p className="rounded-xl border border-rose-400/35 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-400/35 dark:bg-rose-950/40 dark:text-rose-200">
                     {errorMessage}
                   </p>
                 ) : null}
@@ -326,7 +326,7 @@ export const AuthLandingPage = () => {
                   {isSubmitting ? 'Creating Account...' : 'Create an Account'}
                 </button>
 
-                <p className="pt-1 text-base text-slate-300">
+                <p className="pt-1 text-base text-slate-600 dark:text-slate-300">
                   Already have an account?{' '}
                   <button
                     type="button"
@@ -334,7 +334,7 @@ export const AuthLandingPage = () => {
                       setMode('signin');
                       setErrorMessage(null);
                     }}
-                    className="font-semibold text-cyan-300 underline-offset-4 hover:underline"
+                    className="font-semibold text-brand-700 underline-offset-4 hover:underline dark:text-cyan-300"
                   >
                     Sign in
                   </button>
@@ -345,7 +345,7 @@ export const AuthLandingPage = () => {
         </motion.section>
       </div>
 
-      <section id="how-it-works" className="mx-auto mt-7 w-full max-w-7xl rounded-2xl border border-slate-700/70 bg-slate-950/45 p-4 text-sm text-slate-300">
+      <section id="how-it-works" className="mx-auto mt-7 w-full max-w-7xl rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm text-slate-600 dark:border-slate-700/70 dark:bg-slate-950/45 dark:text-slate-300">
         AI-first workflow: upload image -&gt; extract measurements -&gt; map fit across brands -&gt; preview virtual try-on -&gt; reduce returns with confidence.
       </section>
 

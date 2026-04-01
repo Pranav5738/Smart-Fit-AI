@@ -49,6 +49,34 @@ interface BackendProfileSummary {
   last_scan_at?: string;
 }
 
+interface BackendAuthUser {
+  id: string;
+  name: string;
+  email: string;
+  height_cm?: number;
+  weight_kg?: number;
+  created_at: string;
+  last_login_at?: string;
+}
+
+interface RegisterAuthPayload {
+  name: string;
+  email: string;
+  password: string;
+  heightCm?: number;
+  weightKg?: number;
+}
+
+export interface AuthUserRecord {
+  id: string;
+  name: string;
+  email: string;
+  heightCm?: number;
+  weightKg?: number;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
 const normalizeApiError = (error: unknown): string => {
   if (error instanceof AxiosError) {
     const responsePayload = error.response?.data as
@@ -110,6 +138,18 @@ const mapBackendProfileToUserProfile = (profile: BackendProfileSummary): UserPro
     name: profile.name,
     createdAt: profile.created_at,
     scans: [],
+  };
+};
+
+const mapBackendAuthUser = (user: BackendAuthUser): AuthUserRecord => {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    heightCm: user.height_cm,
+    weightKg: user.weight_kg,
+    createdAt: user.created_at,
+    lastLoginAt: user.last_login_at,
   };
 };
 
@@ -224,6 +264,35 @@ export const createProfile = async (name: string): Promise<UserProfile> => {
 export const deleteProfile = async (profileId: string): Promise<void> => {
   try {
     await api.delete(`/profiles/${profileId}`);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const registerAuthUser = async (payload: RegisterAuthPayload): Promise<AuthUserRecord> => {
+  try {
+    const { data } = await api.post<BackendAuthUser>('/auth/register', {
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      height_cm: payload.heightCm,
+      weight_kg: payload.weightKg,
+    });
+
+    return mapBackendAuthUser(data);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const signInAuthUser = async (email: string, password: string): Promise<AuthUserRecord> => {
+  try {
+    const { data } = await api.post<BackendAuthUser>('/auth/signin', {
+      email,
+      password,
+    });
+
+    return mapBackendAuthUser(data);
   } catch (error) {
     throw new Error(normalizeApiError(error));
   }
