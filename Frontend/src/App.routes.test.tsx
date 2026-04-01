@@ -40,6 +40,21 @@ vi.mock('@/pages/DashboardPage', () => ({
 
 const SESSION_KEY = 'smartfit-auth-session';
 
+const createStoredSession = (id: string, email: string, name: string) => ({
+  user: {
+    id,
+    name,
+    email,
+  },
+  tokens: {
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+    tokenType: 'bearer',
+    accessExpiresAt: '2999-01-01T00:00:00.000Z',
+    refreshExpiresAt: '2999-01-10T00:00:00.000Z',
+  },
+});
+
 const renderAt = (path: string) => {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -76,11 +91,7 @@ describe('Route Access Matrix', () => {
   it('redirects authenticated home route to dashboard', async () => {
     localStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({
-        id: 'user-1',
-        name: 'Smart Fit User',
-        email: 'user@example.com',
-      })
+      JSON.stringify(createStoredSession('user-1', 'user@example.com', 'Smart Fit User'))
     );
 
     renderAt('/');
@@ -91,11 +102,7 @@ describe('Route Access Matrix', () => {
   it('allows authenticated users to access dashboard directly', async () => {
     localStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({
-        id: 'user-2',
-        name: 'Smart Fit User 2',
-        email: 'user2@example.com',
-      })
+      JSON.stringify(createStoredSession('user-2', 'user2@example.com', 'Smart Fit User 2'))
     );
 
     renderAt('/dashboard');
@@ -106,11 +113,7 @@ describe('Route Access Matrix', () => {
   it('redirects authenticated upload route to dashboard', async () => {
     localStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({
-        id: 'user-3',
-        name: 'Smart Fit User 3',
-        email: 'user3@example.com',
-      })
+      JSON.stringify(createStoredSession('user-3', 'user3@example.com', 'Smart Fit User 3'))
     );
 
     renderAt('/upload');

@@ -80,9 +80,9 @@ export const AuthLandingPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50 px-4 pb-8 pt-6 text-slate-900 dark:bg-[#05091b] dark:text-slate-100 sm:px-6 lg:px-10">
-      <div className="pointer-events-none absolute inset-0 -z-20 bg-[radial-gradient(ellipse_at_top_left,rgba(125,211,252,0.34),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(96,165,250,0.22),transparent_50%),linear-gradient(140deg,#eff6ff_0%,#f8fafc_46%,#e2e8f0_100%)] dark:bg-[radial-gradient(ellipse_at_top_left,rgba(56,189,248,0.28),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(37,99,235,0.22),transparent_50%),linear-gradient(140deg,#040816_0%,#070f28_46%,#0b1d45_100%)]" />
-      <div className="pointer-events-none absolute inset-0 -z-10 opacity-40 [background-image:radial-gradient(rgba(71,85,105,0.24)_1px,transparent_1px)] [background-size:24px_24px] dark:opacity-70 dark:[background-image:radial-gradient(rgba(191,219,254,0.6)_1px,transparent_1px)]" />
+    <div className="auth-landing-surface relative min-h-screen overflow-hidden px-4 pb-8 pt-6 text-slate-900 dark:text-slate-100 sm:px-6 lg:px-10">
+      <div className="auth-landing-atmosphere pointer-events-none absolute inset-0 -z-20" />
+      <div className="auth-landing-grid pointer-events-none absolute inset-0 -z-10 opacity-45 dark:opacity-70" />
 
       <header className="mx-auto w-full max-w-7xl rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-card backdrop-blur-xl dark:border-sky-300/30 dark:bg-slate-950/55 dark:shadow-[0_0_0_1px_rgba(59,130,246,0.18),0_20px_70px_rgba(10,26,70,0.55)]">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/70 px-4 py-2.5 dark:border-slate-700/70 dark:bg-slate-900/60">
@@ -165,7 +165,7 @@ export const AuthLandingPage = () => {
           transition={{ duration: 0.55, delay: 0.08 }}
           className="relative"
         >
-          <div className="absolute -inset-0.5 -z-10 rounded-[2rem] bg-[linear-gradient(135deg,rgba(34,211,238,0.3),rgba(59,130,246,0.24),rgba(14,165,233,0.2))] blur-md dark:bg-[linear-gradient(135deg,rgba(34,211,238,0.6),rgba(59,130,246,0.45),rgba(14,165,233,0.38))]" />
+          <div className="auth-landing-card-glow absolute -inset-0.5 -z-10 rounded-[2rem] blur-md" />
           <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur-xl dark:border-sky-300/40 dark:bg-[linear-gradient(170deg,rgba(10,18,44,0.88),rgba(17,25,58,0.82)_58%,rgba(10,28,74,0.9))] dark:shadow-[0_25px_90px_rgba(41,76,173,0.45)] sm:p-7">
             <div className="grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/70">
               <button

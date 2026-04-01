@@ -6,17 +6,36 @@
 
 :root {
   color-scheme: light;
+  --auth-landing-surface: #f8fafc;
+  --auth-landing-atmosphere:
+    radial-gradient(ellipse at top left, rgba(125, 211, 252, 0.34), transparent 45%),
+    radial-gradient(ellipse at bottom right, rgba(96, 165, 250, 0.22), transparent 50%),
+    linear-gradient(140deg, #eff6ff 0%, #f8fafc 46%, #e2e8f0 100%);
+  --auth-landing-grid-dot: rgba(71, 85, 105, 0.24);
+  --auth-landing-card-glow:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.3), rgba(59, 130, 246, 0.24), rgba(14, 165, 233, 0.2));
 }
 
-:root.dark {
+:root.dark,
+html.dark {
   color-scheme: dark;
+  --auth-landing-surface: #05091b;
+  --auth-landing-atmosphere:
+    radial-gradient(ellipse at top left, rgba(56, 189, 248, 0.28), transparent 45%),
+    radial-gradient(ellipse at bottom right, rgba(37, 99, 235, 0.22), transparent 50%),
+    linear-gradient(140deg, #040816 0%, #070f28 46%, #0b1d45 100%);
+  --auth-landing-grid-dot: rgba(191, 219, 254, 0.6);
+  --auth-landing-card-glow:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.6), rgba(59, 130, 246, 0.45), rgba(14, 165, 233, 0.38));
 }
 
-:root.contrast {
+:root.contrast,
+html.contrast {
   --contrast-ring: #000000;
 }
 
-:root.contrast.dark {
+:root.contrast.dark,
+html.contrast.dark {
   --contrast-ring: #ffffff;
 }
 
@@ -81,6 +100,23 @@
 @layer components {
   .focus-ring {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900;
+  }
+
+  .auth-landing-surface {
+    background-color: var(--auth-landing-surface);
+  }
+
+  .auth-landing-atmosphere {
+    background: var(--auth-landing-atmosphere);
+  }
+
+  .auth-landing-grid {
+    background-image: radial-gradient(var(--auth-landing-grid-dot) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .auth-landing-card-glow {
+    background: var(--auth-landing-card-glow);
   }
 }
 

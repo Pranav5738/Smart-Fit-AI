@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     consent_version: str = "v1"
     auto_delete_uploaded_images: bool = True
 
+    auth_token_secret: str = "smartfit-dev-secret-change-me"
+    auth_access_token_minutes: int = Field(default=20, gt=0)
+    auth_refresh_token_days: int = Field(default=14, gt=0)
+    auth_max_failed_attempts: int = Field(default=5, gt=0)
+    auth_lockout_minutes: int = Field(default=10, gt=0)
+    auth_attempt_window_minutes: int = Field(default=15, gt=0)
+
     model_path: Path = Field(default=BASE_DIR / "models" / "size_model.pkl")
     tryon_assets_dir: Path = Field(default=BASE_DIR / "static" / "clothing")
     catalog_path: Path = Field(default=BASE_DIR / "static" / "catalog" / "products.csv")

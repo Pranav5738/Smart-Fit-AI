@@ -88,21 +88,6 @@ export const ShowcasePage = () => {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-2xl font-bold">Demo Preview</h2>
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Before</p>
-            <div className="aspect-[4/5] rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-900 dark:to-slate-800" />
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">After AI Try-On</p>
-            <div className="aspect-[4/5] rounded-xl bg-gradient-to-br from-brand-200 to-accent-200 dark:from-brand-950 dark:to-accent-950" />
-          </div>
-        </div>
-      </section>
-
       <section className="rounded-3xl border border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-brand-50 p-6 text-center shadow-card dark:border-brand-800/60 dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-900 dark:to-brand-950/40">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Ready to experience SmartFit AI?</h2>
         <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">

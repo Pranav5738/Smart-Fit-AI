@@ -22,12 +22,14 @@ privacy controls, and shareable fit artifacts.
 
 - main.py
 - routes/
+  - auth.py
   - analyze.py
   - quality.py
   - catalog.py
   - profiles.py
   - privacy.py
 - services/
+  - auth_store.py
   - pipeline.py
   - quality_checker.py
   - explainability.py
@@ -39,6 +41,7 @@ privacy controls, and shareable fit artifacts.
   - recommendation.py
   - virtual_tryon.py
 - models/
+  - auth_schemas.py
   - schemas.py
 - static/
   - catalog/products.csv
@@ -62,13 +65,39 @@ copy .env.example .env
 4. Run API:
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn main:app --reload
+```
+
+## Testing
+
+1. Install test dependencies:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+2. Run API tests:
+
+```bash
+pytest -q tests
 ```
 
 ## Key Endpoints
 
 ### Health
 - GET /health
+
+### Auth
+- POST /auth/register
+  - creates user and returns token-based session payload
+- POST /auth/signin
+  - authenticates and returns token-based session payload
+- POST /auth/refresh
+  - rotates refresh token and returns fresh access/refresh tokens
+- POST /auth/signout
+  - revokes refresh token session
+- GET /auth/me
+  - bearer-token user lookup from access token
 
 ### Quality Check
 - POST /quality-check
@@ -115,6 +144,11 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 - MediaPipe is pinned to 0.10.14 for Pose compatibility.
 - Uploaded image bytes are processed in-memory and discarded after inference.
 - Profile and scan history are persisted in SQLite at model_artifacts/profile_store.db.
+
+## Startup Log Note
+
+- Messages like `inference_feedback_manager.cc:114` from MediaPipe/TensorFlow Lite are warnings, not fatal errors.
+- If you see `Application startup complete`, the API is running correctly.
 
 
 Frontend - npm run dev

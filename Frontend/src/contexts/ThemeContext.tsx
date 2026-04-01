@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -20,6 +21,10 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const THEME_STORAGE_KEY = 'smartfit-theme';
 
 const getInitialTheme = (): ThemeMode => {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
   const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
 
   if (storedTheme === 'light' || storedTheme === 'dark') {
@@ -32,9 +37,13 @@ const getInitialTheme = (): ThemeMode => {
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const rootElement = document.documentElement;
     rootElement.classList.toggle('dark', theme === 'dark');
+    rootElement.style.colorScheme = theme;
+  }, [theme]);
+
+  useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 

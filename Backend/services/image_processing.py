@@ -49,7 +49,7 @@ class ImageProcessingService:
 
         if not results.pose_landmarks:
             raise LandmarkDetectionError(
-                "No pose landmarks detected. Upload a clear full-body image."
+                "No pose landmarks detected. Use a clear full-body photo (head to ankles), face the camera, and keep shoulders, hips, and ankles visible."
             )
 
         image_height, image_width = image_bgr.shape[:2]
@@ -148,5 +148,5 @@ class ImageProcessingService:
             visibility = getattr(landmark, "visibility", 1.0)
             if visibility < self._min_landmark_visibility:
                 raise LandmarkDetectionError(
-                    "Pose detected but key landmarks are not visible enough for accurate sizing."
+                    "Pose detected but key landmarks are unclear. Retake with full body visible (head to ankles), stand straight facing camera, keep arms slightly away from torso, and use bright front lighting."
                 )

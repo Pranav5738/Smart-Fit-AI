@@ -27,6 +27,18 @@ import { compressImageForMobile, evaluateCaptureQuality } from '@/utils/quality'
 
 const isImageFile = (file: File): boolean => file.type.startsWith('image/');
 
+const POSE_REQUIREMENTS = [
+  'Frame full body from head to ankles.',
+  'Face the camera and stand straight.',
+  'Keep both arms slightly away from torso.',
+  'Use bright front lighting and a plain background.',
+  'Keep camera vertical at chest height, about 2-3 meters away.',
+];
+
+type CaptureTimerOption = 0 | 3 | 5 | 10;
+
+const CAPTURE_TIMER_OPTIONS: CaptureTimerOption[] = [0, 3, 5, 10];
+
 export const DashboardPage = () => {
   const { notify } = useToast();
   const { unitSystem, language } = useUserPreferences();
@@ -35,6 +47,7 @@ export const DashboardPage = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const countdownIntervalRef = useRef<number | null>(null);
   const previousPreviewRef = useRef('');
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -43,10 +56,22 @@ export const DashboardPage = () => {
   const [isWebcamOpen, setIsWebcamOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [captureHints, setCaptureHints] = useState<string[]>([]);
+  const [captureTimerSec, setCaptureTimerSec] = useState<CaptureTimerOption>(0);
+  const [countdownSec, setCountdownSec] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [fitPreference, setFitPreference] = useState<FitPreference>('regular');
   const [selectedBrands, setSelectedBrands] = useState<string[]>(DEFAULT_BRANDS);
+
+  const clearCaptureCountdown = useCallback(() => {
+    if (countdownIntervalRef.current !== null) {
+      window.clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
+    setCountdownSec(null);
+  }, []);
 
   const releasePreview = useCallback((next = '') => {
     const previous = previousPreviewRef.current;
@@ -60,11 +85,12 @@ export const DashboardPage = () => {
   }, []);
 
   const stopWebcam = useCallback(() => {
+    clearCaptureCountdown();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setStream(null);
     setIsWebcamOpen(false);
-  }, []);
+  }, [clearCaptureCountdown]);
 
   useEffect(() => {
     if (!videoRef.current || !stream) {
@@ -91,16 +117,18 @@ export const DashboardPage = () => {
         return;
       }
 
+      clearCaptureCountdown();
       const optimized = await compressImageForMobile(file);
       releasePreview(URL.createObjectURL(optimized));
       setSelectedFile(optimized);
+      setCaptureHints([]);
       setErrorMessage(null);
 
       if (optimized.size < file.size) {
         notify('Image optimized for faster analysis.', 'info');
       }
     },
-    [notify, releasePreview]
+    [clearCaptureCountdown, notify, releasePreview]
   );
 
   const toggleBrand = (brand: string) => {
@@ -128,6 +156,8 @@ export const DashboardPage = () => {
   };
 
   const startWebcam = async () => {
+    clearCaptureCountdown();
+
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       streamRef.current = mediaStream;
@@ -141,7 +171,7 @@ export const DashboardPage = () => {
     }
   };
 
-  const captureFromWebcam = () => {
+  const captureFrameFromWebcam = useCallback(() => {
     if (!videoRef.current) {
       return;
     }
@@ -171,7 +201,48 @@ export const DashboardPage = () => {
       void setImageFile(webcamFile);
       stopWebcam();
     }, 'image/jpeg', 0.95);
+  }, [notify, setImageFile, stopWebcam]);
+
+  const captureFromWebcam = () => {
+    if (!videoRef.current) {
+      return;
+    }
+
+    if (countdownSec !== null) {
+      return;
+    }
+
+    if (captureTimerSec === 0) {
+      captureFrameFromWebcam();
+      return;
+    }
+
+    let remainingSeconds = captureTimerSec;
+    setCountdownSec(remainingSeconds);
+    notify(`Photo will be taken in ${captureTimerSec} seconds.`, 'info');
+
+    countdownIntervalRef.current = window.setInterval(() => {
+      remainingSeconds -= 1;
+
+      if (remainingSeconds <= 0) {
+        clearCaptureCountdown();
+        captureFrameFromWebcam();
+        return;
+      }
+
+      setCountdownSec(remainingSeconds);
+    }, 1000);
   };
+
+  const cancelCaptureTimer = () => {
+    if (countdownSec === null) {
+      return;
+    }
+
+    clearCaptureCountdown();
+    notify('Capture timer cancelled.', 'info');
+  };
+
 
   const handleAnalyze = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -190,7 +261,9 @@ export const DashboardPage = () => {
     setErrorMessage(null);
 
     try {
-      await evaluateCaptureQuality(selectedFile, language);
+      const qualityReport = await evaluateCaptureQuality(selectedFile, language);
+      setCaptureHints(qualityReport.hints.slice(0, 3));
+
       const response = await analyzeImage(selectedFile, {
         fitPreference,
         profileId: activeProfile.id,
@@ -314,6 +387,26 @@ export const DashboardPage = () => {
               </button>
             </div>
 
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Pose Checklist</p>
+              <div className="mt-2 space-y-1.5 text-sm text-amber-800 dark:text-amber-200">
+                {POSE_REQUIREMENTS.map((tip) => (
+                  <p key={tip}>- {tip}</p>
+                ))}
+              </div>
+            </div>
+
+            {captureHints.length > 0 ? (
+              <div className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900/40 dark:bg-cyan-950/20">
+                <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">Capture Feedback</p>
+                <div className="mt-2 space-y-1.5 text-sm text-cyan-800 dark:text-cyan-200">
+                  {captureHints.map((hint) => (
+                    <p key={hint}>- {hint}</p>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
               <p className="text-sm font-semibold">Fit Preference</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -361,14 +454,58 @@ export const DashboardPage = () => {
             {isWebcamOpen ? (
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
                 <video ref={videoRef} autoPlay playsInline muted className="aspect-[4/5] w-full rounded-xl bg-slate-900 object-cover" />
-                <div className="flex gap-2">
+
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                    Capture Timer
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {CAPTURE_TIMER_OPTIONS.map((seconds) => {
+                      const selected = captureTimerSec === seconds;
+
+                      return (
+                        <button
+                          key={seconds}
+                          type="button"
+                          onClick={() => setCaptureTimerSec(seconds)}
+                          disabled={countdownSec !== null}
+                          className={`focus-ring rounded-lg border px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                            selected
+                              ? 'border-brand-600 bg-brand-600 text-white'
+                              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {seconds === 0 ? 'None' : `${seconds}s`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={captureFromWebcam}
+                    disabled={countdownSec !== null}
                     className="focus-ring rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Capture
+                    {countdownSec !== null
+                      ? `Capturing in ${countdownSec}s`
+                      : captureTimerSec === 0
+                        ? 'Capture'
+                        : `Capture in ${captureTimerSec}s`}
                   </button>
+
+                  {countdownSec !== null ? (
+                    <button
+                      type="button"
+                      onClick={cancelCaptureTimer}
+                      className="focus-ring rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                    >
+                      Stop Timer
+                    </button>
+                  ) : null}
+
                   <button
                     type="button"
                     onClick={stopWebcam}

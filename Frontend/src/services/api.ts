@@ -14,6 +14,24 @@ const api = axios.create({
   timeout: 30000,
 });
 
+const POSE_GUIDANCE_ERROR =
+  'Pose was detected, but sizing landmarks are unclear. Retake with full body visible (head to ankles), face the camera, keep arms slightly away from torso, and use bright front lighting.';
+
+let activeAccessToken: string | null = null;
+
+export const configureAccessToken = (accessToken: string | null) => {
+  activeAccessToken = accessToken?.trim() || null;
+
+  if (activeAccessToken) {
+    api.defaults.headers.common.Authorization = `Bearer ${activeAccessToken}`;
+    return;
+  }
+
+  delete api.defaults.headers.common.Authorization;
+};
+
+export const getConfiguredAccessToken = (): string | null => activeAccessToken;
+
 interface AnalyzeImageOptions {
   fitPreference?: FitPreference;
   userHeightCm?: number;
@@ -59,6 +77,19 @@ interface BackendAuthUser {
   last_login_at?: string;
 }
 
+interface BackendAuthTokens {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  access_expires_at: string;
+  refresh_expires_at: string;
+}
+
+interface BackendAuthSession {
+  user: BackendAuthUser;
+  tokens: BackendAuthTokens;
+}
+
 interface RegisterAuthPayload {
   name: string;
   email: string;
@@ -77,6 +108,19 @@ export interface AuthUserRecord {
   lastLoginAt?: string;
 }
 
+export interface AuthTokenRecord {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  accessExpiresAt: string;
+  refreshExpiresAt: string;
+}
+
+export interface AuthSessionRecord {
+  user: AuthUserRecord;
+  tokens: AuthTokenRecord;
+}
+
 const normalizeApiError = (error: unknown): string => {
   if (error instanceof AxiosError) {
     const responsePayload = error.response?.data as
@@ -87,6 +131,12 @@ const normalizeApiError = (error: unknown): string => {
         }
       | undefined;
 
+    const errorCode = String(responsePayload?.error_code || '').toUpperCase();
+
+    if (errorCode === 'LANDMARK_DETECTION_ERROR') {
+      return POSE_GUIDANCE_ERROR;
+    }
+
     const detailMessage =
       typeof responsePayload?.detail === 'string'
         ? responsePayload.detail
@@ -95,6 +145,11 @@ const normalizeApiError = (error: unknown): string => {
           : '';
 
     const responseMessage = responsePayload?.message || detailMessage || error.message;
+
+    if (/landmark|pose detected|full-body|full body/i.test(responseMessage)) {
+      return POSE_GUIDANCE_ERROR;
+    }
+
     return responseMessage || 'Unable to analyze the image right now. Please try again.';
   }
 
@@ -150,6 +205,23 @@ const mapBackendAuthUser = (user: BackendAuthUser): AuthUserRecord => {
     weightKg: user.weight_kg,
     createdAt: user.created_at,
     lastLoginAt: user.last_login_at,
+  };
+};
+
+const mapBackendAuthTokens = (tokens: BackendAuthTokens): AuthTokenRecord => {
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    tokenType: tokens.token_type || 'bearer',
+    accessExpiresAt: tokens.access_expires_at,
+    refreshExpiresAt: tokens.refresh_expires_at,
+  };
+};
+
+const mapBackendAuthSession = (payload: BackendAuthSession): AuthSessionRecord => {
+  return {
+    user: mapBackendAuthUser(payload.user),
+    tokens: mapBackendAuthTokens(payload.tokens),
   };
 };
 
@@ -269,14 +341,53 @@ export const deleteProfile = async (profileId: string): Promise<void> => {
   }
 };
 
-export const registerAuthUser = async (payload: RegisterAuthPayload): Promise<AuthUserRecord> => {
+export const registerAuthUser = async (payload: RegisterAuthPayload): Promise<AuthSessionRecord> => {
   try {
-    const { data } = await api.post<BackendAuthUser>('/auth/register', {
+    const { data } = await api.post<BackendAuthSession>('/auth/register', {
       name: payload.name,
       email: payload.email,
       password: payload.password,
       height_cm: payload.heightCm,
       weight_kg: payload.weightKg,
+    });
+
+    return mapBackendAuthSession(data);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const signInAuthUser = async (email: string, password: string): Promise<AuthSessionRecord> => {
+  try {
+    const { data } = await api.post<BackendAuthSession>('/auth/signin', {
+      email,
+      password,
+    });
+
+    return mapBackendAuthSession(data);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const refreshAuthSession = async (refreshToken: string): Promise<AuthSessionRecord> => {
+  try {
+    const { data } = await api.post<BackendAuthSession>('/auth/refresh', {
+      refresh_token: refreshToken,
+    });
+
+    return mapBackendAuthSession(data);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const fetchAuthMe = async (accessToken: string): Promise<AuthUserRecord> => {
+  try {
+    const { data } = await api.get<BackendAuthUser>('/auth/me', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     });
 
     return mapBackendAuthUser(data);
@@ -285,14 +396,11 @@ export const registerAuthUser = async (payload: RegisterAuthPayload): Promise<Au
   }
 };
 
-export const signInAuthUser = async (email: string, password: string): Promise<AuthUserRecord> => {
+export const signOutAuthSession = async (refreshToken: string): Promise<void> => {
   try {
-    const { data } = await api.post<BackendAuthUser>('/auth/signin', {
-      email,
-      password,
+    await api.post('/auth/signout', {
+      refresh_token: refreshToken,
     });
-
-    return mapBackendAuthUser(data);
   } catch (error) {
     throw new Error(normalizeApiError(error));
   }

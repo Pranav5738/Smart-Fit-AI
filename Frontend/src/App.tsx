@@ -11,9 +11,6 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { UserPreferencesProvider } from '@/contexts/UserPreferencesContext';
 
-const AuthLandingPage = lazy(() =>
-  import('@/pages/AuthLandingPage').then((module) => ({ default: module.AuthLandingPage }))
-);
 const ShowcasePage = lazy(() => import('@/pages/ShowcasePage').then((module) => ({ default: module.ShowcasePage })));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
 const SignInPage = lazy(() => import('@/pages/SignInPage').then((module) => ({ default: module.SignInPage })));
@@ -55,7 +52,7 @@ const AuthHomeRoute = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <AuthLandingPage />;
+  return <Navigate to="/signin" replace />;
 };
 
 const ProtectedRoute = () => {

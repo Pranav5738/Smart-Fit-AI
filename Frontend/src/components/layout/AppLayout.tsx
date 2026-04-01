@@ -1,7 +1,7 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfiles } from '@/contexts/ProfileContext';
 import { useUserPreferences } from '@/contexts/UserPreferencesContext';
@@ -15,7 +15,7 @@ const links = [
 
 export const AppLayout = ({ children }: { children: ReactNode }) => {
   const { user, isAuthenticated, signOut } = useAuth();
-  const { profiles, activeProfileId, setActiveProfileId, createProfile } = useProfiles();
+  const { profiles, activeProfileId, setActiveProfileId, createProfile, deleteProfile } = useProfiles();
   const {
     language,
     unitSystem,
@@ -26,9 +26,16 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
     t,
   } = useUserPreferences();
   const { notify } = useToast();
+  const location = useLocation();
   const visibleLinks = isAuthenticated ? links : links.filter((link) => link.to !== '/dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsPanelRef = useRef<HTMLDivElement | null>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const firstSettingsControlRef = useRef<HTMLSelectElement | null>(null);
+
+  useEffect(() => {
+    setIsSettingsOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!isSettingsOpen) {
@@ -44,6 +51,9 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsSettingsOpen(false);
+        requestAnimationFrame(() => {
+          settingsButtonRef.current?.focus();
+        });
       }
     };
 
@@ -55,6 +65,44 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
       document.removeEventListener('keydown', handleEscape);
     };
   }, [isSettingsOpen]);
+
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      firstSettingsControlRef.current?.focus();
+    });
+  }, [isSettingsOpen]);
+
+  const handleSettingsPanelKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = event.currentTarget.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+
+    if (focusableElements.length === 0) {
+      return;
+    }
+
+    const first = focusableElements[0];
+    const last = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const handleCreateProfile = async () => {
     const profileName = window.prompt(t('Name your new profile', 'Nombra tu nuevo perfil'));
@@ -68,6 +116,41 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
       notify(t('Profile created.', 'Perfil creado.'), 'success');
     } catch {
       notify(t('Unable to create profile right now.', 'No se pudo crear el perfil.'), 'error');
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    const selectedProfile = profiles.find((profile) => profile.id === activeProfileId);
+
+    if (!selectedProfile) {
+      return;
+    }
+
+    if (profiles.length <= 1) {
+      notify(t('At least one profile is required.', 'Se requiere al menos un perfil.'), 'info');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      t(
+        `Delete profile "${selectedProfile.name}"? This action cannot be undone.`,
+        `¿Eliminar el perfil "${selectedProfile.name}"? Esta accion no se puede deshacer.`
+      )
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteProfile(selectedProfile.id);
+      notify(t('Profile deleted.', 'Perfil eliminado.'), 'success');
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t('Unable to delete profile right now.', 'No se pudo eliminar el perfil.');
+      notify(message, 'error');
     }
   };
 
@@ -128,6 +211,7 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
             {isAuthenticated ? (
               <div ref={settingsPanelRef} className="relative">
                 <button
+                  ref={settingsButtonRef}
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={isSettingsOpen}
@@ -138,7 +222,12 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
                 </button>
 
                 {isSettingsOpen ? (
-                  <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-card backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95">
+                  <div
+                    role="menu"
+                    aria-label={t('Settings menu', 'Menu de ajustes')}
+                    onKeyDown={handleSettingsPanelKeyDown}
+                    className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-card backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95"
+                  >
                     <div className="mb-3 flex items-center justify-between rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/85">
                       <div>
                         <p className="text-sm font-semibold text-brand-800 dark:text-slate-100">{user?.name}</p>
@@ -155,6 +244,7 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
                           {t('Profile', 'Perfil')}
                         </label>
                         <select
+                          ref={firstSettingsControlRef}
                           value={activeProfileId}
                           onChange={(event) => setActiveProfileId(event.target.value)}
                           className="focus-ring w-full rounded-xl border border-slate-300 bg-white px-2 py-1.5 font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
@@ -173,6 +263,15 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
                         className="focus-ring w-full rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
                         {t('New Profile', 'Nuevo perfil')}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDeleteProfile}
+                        disabled={profiles.length <= 1}
+                        className="focus-ring w-full rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1.5 font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-200 dark:hover:bg-rose-950/35"
+                      >
+                        {t('Delete Profile', 'Eliminar perfil')}
                       </button>
 
                       <div className="grid grid-cols-2 gap-2">

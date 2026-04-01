@@ -1,5 +1,6 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { ReactNode } from 'react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,15 +8,94 @@ import { useToast } from '@/contexts/ToastContext';
 import { WaveFooter } from '@/components/layout/WaveFooter';
 
 const publicLinks = [
-  { to: '/', label: 'Start' },
   { to: '/showcase', label: 'Showcase' },
 ];
 
 export const AuthShellLayout = ({ children }: { children: ReactNode }) => {
-  const { user, isAuthenticated, signOut } = useAuth();
+  const { isAuthenticated, signOut } = useAuth();
   const { notify } = useToast();
+  const location = useLocation();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsPanelRef = useRef<HTMLDivElement | null>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsSettingsOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!settingsPanelRef.current?.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsSettingsOpen(false);
+        requestAnimationFrame(() => {
+          settingsButtonRef.current?.focus();
+        });
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isSettingsOpen]);
+
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      const firstFocusable = menuPanelRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      firstFocusable?.focus();
+    });
+  }, [isSettingsOpen]);
+
+  const handleSettingsPanelKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = event.currentTarget.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+
+    if (focusableElements.length === 0) {
+      return;
+    }
+
+    const first = focusableElements[0];
+    const last = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const handleSignOut = () => {
+    setIsSettingsOpen(false);
     signOut();
     notify('Signed out successfully.', 'info');
   };
@@ -29,7 +109,7 @@ export const AuthShellLayout = ({ children }: { children: ReactNode }) => {
 
       <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/85 backdrop-blur-xl dark:border-slate-800/70 dark:bg-slate-900/75">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <NavLink to={isAuthenticated ? '/dashboard' : '/'} className="flex items-center gap-2.5">
+          <NavLink to={isAuthenticated ? '/dashboard' : '/signin'} className="flex items-center gap-2.5">
             <img
               src="/smartfit-logo-mark.svg"
               alt="SmartFit AI"
@@ -74,16 +154,42 @@ export const AuthShellLayout = ({ children }: { children: ReactNode }) => {
                 >
                   Dashboard
                 </NavLink>
-                <span className="hidden rounded-xl bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 dark:bg-brand-950/30 dark:text-brand-200 sm:inline-flex">
-                  {user?.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="focus-ring rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-200 dark:hover:bg-rose-950/35"
-                >
-                  Sign Out
-                </button>
+
+                <div ref={settingsPanelRef} className="relative">
+                  <button
+                    ref={settingsButtonRef}
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={isSettingsOpen}
+                    onClick={() => setIsSettingsOpen((current) => !current)}
+                    className="focus-ring rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Settings
+                  </button>
+
+                  {isSettingsOpen ? (
+                    <div
+                      ref={menuPanelRef}
+                      role="menu"
+                      aria-label="Settings menu"
+                      onKeyDown={handleSettingsPanelKeyDown}
+                      className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-card backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95"
+                    >
+                      <div className="mb-3 flex items-center justify-between rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-900">
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Theme</span>
+                        <ThemeToggle />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="focus-ring w-full rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-200 dark:hover:bg-rose-950/35"
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </>
             ) : (
               <>
@@ -114,7 +220,7 @@ export const AuthShellLayout = ({ children }: { children: ReactNode }) => {
               </>
             )}
 
-            <ThemeToggle />
+            {!isAuthenticated ? <ThemeToggle /> : null}
           </div>
         </div>
       </header>

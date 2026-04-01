@@ -12,6 +12,7 @@ type ToastType = 'success' | 'error' | 'info';
 
 interface Toast {
   id: number;
+  createdAt: number;
   message: string;
   type: ToastType;
 }
@@ -37,8 +38,22 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
   const notify = useCallback(
     (message: string, type: ToastType = 'info') => {
+      const createdAt = Date.now();
       const id = Date.now() + Math.round(Math.random() * 1000);
-      setToasts((currentToasts) => [...currentToasts, { id, message, type }]);
+      setToasts((currentToasts) => {
+        const hasRecentDuplicate = currentToasts.some(
+          (toast) =>
+            toast.type === type &&
+            toast.message === message &&
+            createdAt - toast.createdAt < 1800
+        );
+
+        if (hasRecentDuplicate) {
+          return currentToasts;
+        }
+
+        return [...currentToasts, { id, createdAt, message, type }];
+      });
       window.setTimeout(() => dismissToast(id), 3400);
     },
     [dismissToast]

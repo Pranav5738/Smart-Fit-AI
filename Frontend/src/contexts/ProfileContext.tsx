@@ -20,6 +20,7 @@ interface ProfileContextValue {
   activeProfile: UserProfile;
   setActiveProfileId: (profileId: string) => void;
   createProfile: (name: string) => Promise<string>;
+  deleteProfile: (profileId: string) => Promise<void>;
   saveScan: (profileId: string, scan: Omit<SavedScan, 'id'>) => void;
   exportData: () => string;
   deleteAllData: () => void;
@@ -159,6 +160,40 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
     [profiles, persistProfiles]
   );
 
+  const deleteProfile = useCallback(
+    async (profileId: string) => {
+      const profileExists = profiles.some((profile) => profile.id === profileId);
+
+      if (!profileExists) {
+        return;
+      }
+
+      if (profiles.length <= 1) {
+        throw new Error('At least one profile is required.');
+      }
+
+      try {
+        await deleteProfileApi(profileId);
+      } catch {
+        // Keep local deletion behavior even if backend delete is unavailable.
+      }
+
+      const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
+      persistProfiles(nextProfiles);
+
+      setActiveProfileIdState((currentId) => {
+        const resolvedId =
+          currentId === profileId || !nextProfiles.some((profile) => profile.id === currentId)
+            ? nextProfiles[0].id
+            : currentId;
+
+        localStorage.setItem(STORAGE_KEYS.activeProfileId, resolvedId);
+        return resolvedId;
+      });
+    },
+    [profiles, persistProfiles]
+  );
+
   const saveScan = useCallback(
     (profileId: string, scan: Omit<SavedScan, 'id'>) => {
       const nextProfiles = profiles.map((profile) => {
@@ -226,11 +261,22 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       activeProfile,
       setActiveProfileId,
       createProfile,
+      deleteProfile,
       saveScan,
       exportData,
       deleteAllData,
     }),
-    [profiles, activeProfile.id, activeProfile, setActiveProfileId, createProfile, saveScan, exportData, deleteAllData]
+    [
+      profiles,
+      activeProfile.id,
+      activeProfile,
+      setActiveProfileId,
+      createProfile,
+      deleteProfile,
+      saveScan,
+      exportData,
+      deleteAllData,
+    ]
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
