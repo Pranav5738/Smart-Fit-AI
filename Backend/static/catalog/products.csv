@@ -1,0 +1,25 @@
+sku,brand,product_name,category,occasions,weather,color,image_name
+NK-TEE-001,Nike,Dri-FIT Daily Tee,tees,"casual|gym","summer|all-season",dark,tee.png
+NK-JKT-002,Nike,Essential Windrunner Jacket,jackets,"casual|gym|travel","winter|all-season",dark,shirt.png
+NK-JNS-003,Nike,Club Stretch Utility Pants,jeans,"casual|travel","all-season",neutral,default_shirt.png
+ZR-TEE-004,Zara,Textured Slim Tee,tees,"formal|casual","summer|all-season",bright,tee.png
+ZR-JKT-005,Zara,Structured Bomber,jackets,"casual|travel","winter|all-season",dark,shirt.png
+ZR-JNS-006,Zara,Tapered Denim,jeans,"casual|formal","all-season",neutral,default_shirt.png
+HM-TEE-007,H&M,Premium Cotton Tee,tees,"casual|gym","summer|all-season",neutral,tee.png
+HM-JKT-008,H&M,Relaxed Utility Jacket,jackets,"casual|travel","winter|all-season",dark,shirt.png
+HM-JNS-009,H&M,Straight Fit Denim,jeans,"casual|travel","all-season",neutral,default_shirt.png
+AD-TEE-010,Adidas,Training Aeroready Tee,tees,"gym|casual","summer|all-season",dark,tee.png
+AD-JKT-011,Adidas,Tiro Track Jacket,jackets,"gym|travel","winter|all-season",dark,shirt.png
+AD-JNS-012,Adidas,City Utility Pants,jeans,"casual|travel","all-season",neutral,default_shirt.png
+UQ-TEE-013,Uniqlo,AIRism Crew Neck Tee,tees,"casual|formal","summer|all-season",neutral,tee.png
+UQ-JKT-014,Uniqlo,BlockTech Parka,jackets,"travel|casual","winter|all-season",dark,shirt.png
+UQ-JNS-015,Uniqlo,Smart Ankle Jeans,jeans,"formal|casual","all-season",neutral,default_shirt.png
+LV-TEE-016,Levi's,Graphic Pocket Tee,tees,"casual","summer|all-season",bright,tee.png
+LV-JKT-017,Levi's,Classic Trucker Jacket,jackets,"casual|travel","winter|all-season",bright,shirt.png
+LV-JNS-018,Levi's,511 Slim Jeans,jeans,"casual|formal","all-season",dark,default_shirt.png
+PM-TEE-019,Puma,Cloudspin Tee,tees,"gym|casual","summer|all-season",bright,tee.png
+PM-JKT-020,Puma,Run Shield Jacket,jackets,"gym|travel","winter|all-season",dark,shirt.png
+PM-JNS-021,Puma,Flex Street Jeans,jeans,"casual|travel","all-season",neutral,default_shirt.png
+GP-TEE-022,Gap,Organic Soft Tee,tees,"casual|formal","summer|all-season",neutral,tee.png
+GP-JKT-023,Gap,Canvas Utility Jacket,jackets,"casual|travel","winter|all-season",neutral,shirt.png
+GP-JNS-024,Gap,Vintage Straight Denim,jeans,"casual|formal","all-season",dark,default_shirt.png

@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+:root.contrast {
+  --contrast-ring: #000000;
+}
+
+:root.contrast.dark {
+  --contrast-ring: #ffffff;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply font-body antialiased;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(6, 182, 212, 0.2) 0, transparent 26%),
+      radial-gradient(circle at 85% 80%, rgba(249, 115, 22, 0.18) 0, transparent 30%),
+      #f8fafc;
+  }
+
+  .dark body {
+    background:
+      radial-gradient(circle at 15% 20%, rgba(8, 145, 178, 0.24) 0, transparent 30%),
+      radial-gradient(circle at 85% 80%, rgba(194, 65, 12, 0.2) 0, transparent 30%),
+      #020617;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+@layer components {
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900;
+  }
+}
+
+@layer utilities {
+  .contrast .border,
+  .contrast [class*='border-'] {
+    border-width: 2px !important;
+  }
+
+  .contrast .shadow-card,
+  .contrast .shadow-soft {
+    box-shadow: none !important;
+  }
+
+  .contrast button,
+  .contrast a,
+  .contrast select,
+  .contrast input,
+  .contrast textarea {
+    outline-color: var(--contrast-ring);
+  }
+}

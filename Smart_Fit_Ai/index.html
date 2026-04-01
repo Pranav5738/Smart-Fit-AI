@@ -3,58 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="/smartfit-logo-mark.svg">
   <title>SmartFit AI</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            primary: {
-              DEFAULT: '#007BFF',
-              '50': '#E6F2FF',
-              '100': '#CCE5FF',
-              '200': '#99CAFF',
-              '300': '#66B0FF',
-              '400': '#3395FF',
-              '500': '#007BFF',
-              '600': '#0062CC',
-              '700': '#004A99',
-              '800': '#003166',
-              '900': '#001933',
-            },
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-    }
-    @import url('https://rsms.me/inter/inter.css');
-  </style>
-<script type="importmap">
-{
-  "imports": {
-    "rxjs": "https://aistudiocdn.com/rxjs@^7.8.2?conditions=es2015",
-    "rxjs/operators": "https://aistudiocdn.com/rxjs@^7.8.2/operators?conditions=es2015",
-    "rxjs/ajax": "https://aistudiocdn.com/rxjs@^7.8.2/ajax?conditions=es2015",
-    "rxjs/webSocket": "https://aistudiocdn.com/rxjs@^7.8.2/webSocket?conditions=es2015",
-    "rxjs/testing": "https://aistudiocdn.com/rxjs@^7.8.2/testing?conditions=es2015",
-    "rxjs/fetch": "https://aistudiocdn.com/rxjs@^7.8.2/fetch?conditions=es2015",
-    "@angular/core": "https://next.esm.sh/@angular/core@^20.3.2?external=rxjs",
-    "@angular/compiler": "https://next.esm.sh/@angular/compiler@^20.3.2?external=rxjs",
-    "@angular/common": "https://next.esm.sh/@angular/common@^20.3.2?external=rxjs",
-    "@angular/common/http": "https://next.esm.sh/@angular/common@^20.3.2/http?external=rxjs",
-    "@angular/platform-browser": "https://next.esm.sh/@angular/platform-browser@^20.3.2?external=rxjs"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-gray-50 dark:bg-gray-900">
-  <app-root></app-root>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

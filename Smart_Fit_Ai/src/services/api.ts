@@ -1,0 +1,230 @@
+import axios, { AxiosError } from 'axios';
+import {
+  AnalyzeResponse,
+  CaptureQualityReport,
+  FitPreference,
+  LanguageCode,
+  RecommendationItem,
+  UnitSystem,
+  UserProfile,
+} from '@/types/smartfit';
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localhost:8000',
+  timeout: 30000,
+});
+
+interface AnalyzeImageOptions {
+  fitPreference?: FitPreference;
+  userHeightCm?: number;
+  profileId?: string;
+  saveToHistory?: boolean;
+  consentAccepted?: boolean;
+  unitSystem?: UnitSystem;
+  language?: LanguageCode;
+  includeTryonComparison?: boolean;
+  productCategories?: string[];
+  occasions?: string[];
+  weather?: string[];
+  colorPreferences?: string[];
+}
+
+interface BackendQualityCheckResponse {
+  capture_quality: {
+    overall_score: number;
+    pose_score: number;
+    lighting_score: number;
+    framing_score: number;
+    sharpness_score: number;
+    hints: string[];
+  };
+  guidance: string[];
+}
+
+interface BackendProfileSummary {
+  id: string;
+  name: string;
+  created_at: string;
+  scan_count: number;
+  last_scan_at?: string;
+}
+
+const normalizeApiError = (error: unknown): string => {
+  if (error instanceof AxiosError) {
+    const responsePayload = error.response?.data as
+      | {
+          message?: string;
+          detail?: string | Array<{ msg?: string }>;
+          error_code?: string;
+        }
+      | undefined;
+
+    const detailMessage =
+      typeof responsePayload?.detail === 'string'
+        ? responsePayload.detail
+        : Array.isArray(responsePayload?.detail)
+          ? responsePayload.detail.map((item) => item?.msg).filter(Boolean).join(', ')
+          : '';
+
+    const responseMessage = responsePayload?.message || detailMessage || error.message;
+    return responseMessage || 'Unable to analyze the image right now. Please try again.';
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unexpected error while processing your request.';
+};
+
+const toCsv = (values?: string[]): string | undefined => {
+  const cleaned = (values || []).map((value) => value.trim()).filter(Boolean);
+  return cleaned.length > 0 ? cleaned.join(',') : undefined;
+};
+
+const normalizeRecommendation = (item: string | RecommendationItem, index: number): RecommendationItem => {
+  if (typeof item === 'string') {
+    return { name: item };
+  }
+
+  const name = item.name || item.product_name || `Outfit ${index + 1}`;
+  return {
+    ...item,
+    name,
+    description: item.description || item.reason,
+  };
+};
+
+const normalizeAnalyzeResponse = (payload: AnalyzeResponse): AnalyzeResponse => {
+  return {
+    ...payload,
+    recommendations: (payload.recommendations || []).map((item, index) =>
+      normalizeRecommendation(item, index)
+    ),
+  };
+};
+
+const mapBackendProfileToUserProfile = (profile: BackendProfileSummary): UserProfile => {
+  return {
+    id: profile.id,
+    name: profile.name,
+    createdAt: profile.created_at,
+    scans: [],
+  };
+};
+
+const mapQualityResponse = (payload: BackendQualityCheckResponse): CaptureQualityReport => {
+  return {
+    overallScore: payload.capture_quality.overall_score,
+    poseScore: payload.capture_quality.pose_score,
+    lightingScore: payload.capture_quality.lighting_score,
+    framingScore: payload.capture_quality.framing_score,
+    sharpnessScore: payload.capture_quality.sharpness_score,
+    hints: payload.capture_quality.hints || payload.guidance || [],
+  };
+};
+
+export const analyzeImage = async (
+  imageFile: File,
+  options?: AnalyzeImageOptions
+): Promise<AnalyzeResponse> => {
+  const formData = new FormData();
+  formData.append('image', imageFile);
+
+  formData.append('fit_preference', options?.fitPreference || 'regular');
+  formData.append('unit_system', options?.unitSystem || 'in');
+  formData.append('language', options?.language || 'en');
+  formData.append(
+    'include_tryon_comparison',
+    String(options?.includeTryonComparison ?? true)
+  );
+  formData.append('consent_accepted', String(options?.consentAccepted ?? true));
+
+  if (typeof options?.userHeightCm === 'number') {
+    formData.append('user_height_cm', String(options.userHeightCm));
+  }
+
+  const categories = toCsv(options?.productCategories);
+  if (categories) {
+    formData.append('product_categories', categories);
+  }
+
+  const occasions = toCsv(options?.occasions);
+  if (occasions) {
+    formData.append('occasions', occasions);
+  }
+
+  const weather = toCsv(options?.weather);
+  if (weather) {
+    formData.append('weather', weather);
+  }
+
+  const colors = toCsv(options?.colorPreferences);
+  if (colors) {
+    formData.append('color_preferences', colors);
+  }
+
+  if (options?.profileId) {
+    formData.append('profile_id', options.profileId);
+    formData.append('save_to_history', String(options.saveToHistory ?? true));
+  }
+
+  try {
+    const { data } = await api.post<AnalyzeResponse>('/analyze-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return normalizeAnalyzeResponse(data);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const qualityCheck = async (
+  imageFile: File,
+  language: LanguageCode = 'en'
+): Promise<CaptureQualityReport> => {
+  const formData = new FormData();
+  formData.append('image', imageFile);
+  formData.append('language', language);
+
+  try {
+    const { data } = await api.post<BackendQualityCheckResponse>('/quality-check', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return mapQualityResponse(data);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const listProfiles = async (): Promise<UserProfile[]> => {
+  try {
+    const { data } = await api.get<BackendProfileSummary[]>('/profiles/');
+    return data.map(mapBackendProfileToUserProfile);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const createProfile = async (name: string): Promise<UserProfile> => {
+  try {
+    const { data } = await api.post<BackendProfileSummary>('/profiles/', { name });
+    return mapBackendProfileToUserProfile(data);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const deleteProfile = async (profileId: string): Promise<void> => {
+  try {
+    await api.delete(`/profiles/${profileId}`);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
