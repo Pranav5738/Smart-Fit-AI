@@ -62,7 +62,15 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-4. Run API:
+4. Render deployment:
+
+Use `Backend/requirements.txt` for dependencies and start the service with:
+
+```bash
+gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+```
+
+5. Run API:
 
 ```bash
 python -m uvicorn main:app --reload
