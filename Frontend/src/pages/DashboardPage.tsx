@@ -12,11 +12,12 @@ import { ProcessingState } from '@/components/processing/ProcessingState';
 import { VirtualTryOn } from '@/components/results/VirtualTryOn';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { BRAND_OPTIONS, DEFAULT_BRANDS } from '@/data/brands';
+import { useAuth } from '@/contexts/AuthContext';
 import { useProfiles } from '@/contexts/ProfileContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useUserPreferences } from '@/contexts/UserPreferencesContext';
 import { analyzeImage } from '@/services/api';
-import type { AnalyzeResponse, FitPreference } from '@/types/smartfit';
+import type { AgeGroup, AnalyzeResponse, FitPreference, GenderCode } from '@/types/smartfit';
 import {
   confidenceToPercent,
   formatMeasurementValue,
@@ -41,6 +42,7 @@ const CAPTURE_TIMER_OPTIONS: CaptureTimerOption[] = [0, 3, 5, 10];
 
 export const DashboardPage = () => {
   const { notify } = useToast();
+  const { user } = useAuth();
   const { unitSystem, language } = useUserPreferences();
   const { activeProfile } = useProfiles();
 
@@ -62,6 +64,8 @@ export const DashboardPage = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [fitPreference, setFitPreference] = useState<FitPreference>('regular');
+  const [ageGroup, setAgeGroup] = useState<AgeGroup>('adult');
+  const [gender, setGender] = useState<GenderCode>('unisex');
   const [selectedBrands, setSelectedBrands] = useState<string[]>(DEFAULT_BRANDS);
 
   const clearCaptureCountdown = useCallback(() => {
@@ -264,8 +268,13 @@ export const DashboardPage = () => {
       const qualityReport = await evaluateCaptureQuality(selectedFile, language);
       setCaptureHints(qualityReport.hints.slice(0, 3));
 
+      const resolvedHeightCm = ageGroup === 'adult' ? user?.heightCm : undefined;
+
       const response = await analyzeImage(selectedFile, {
         fitPreference,
+        userHeightCm: resolvedHeightCm,
+        ageGroup,
+        gender,
         profileId: activeProfile.id,
         saveToHistory: true,
         consentAccepted: true,
@@ -314,242 +323,316 @@ export const DashboardPage = () => {
 
   return (
     <>
-      <div className="space-y-6 pb-8">
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300">
-            SmartFit Dashboard
-          </p>
-          <h1 className="mt-2 text-3xl font-bold">Analyze Your Fit Profile</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Upload or capture an image, run AI analysis, and review measurements, predicted size, brand mapping, confidence score, try-on preview, and recommendations.
-          </p>
+      <div className="space-y-6 pb-8 sm:space-y-8 sm:pb-10">
+        <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+          <div className="pointer-events-none absolute -right-14 -top-20 h-56 w-56 rounded-full bg-brand-200/55 blur-3xl dark:bg-brand-700/30" />
+          <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-accent-200/55 blur-3xl dark:bg-accent-700/20" />
+
+          <div className="relative">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700 dark:text-brand-300">
+              SmartFit Dashboard
+            </p>
+            <h1 className="mt-2 text-[2rem] font-bold leading-tight sm:text-4xl">Analyze Your Fit Profile</h1>
+            <p className="mt-3 max-w-3xl text-sm text-slate-600 dark:text-slate-300 sm:text-base">
+              Upload a full-body image, run AI analysis, and review your measurements, fit confidence,
+              brand mapping, and virtual try-on in one streamlined workspace.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full border border-brand-300 bg-brand-50 px-3 py-1 text-brand-700 dark:border-brand-800 dark:bg-brand-950/35 dark:text-brand-300">
+                Profile: {activeProfile.name}
+              </span>
+              <span className="rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                Fit: {fitPreference}
+              </span>
+              <span className="rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                Brands: {selectedBrands.length}
+              </span>
+            </div>
+          </div>
         </section>
 
-        <form onSubmit={handleAnalyze} className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div
-              onDragOver={(event) => {
-                event.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={(event) => {
-                event.preventDefault();
-                setIsDragging(false);
-              }}
-              onDrop={handleDrop}
-              className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${
-                isDragging
-                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/20'
-                  : 'border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40'
-              }`}
-            >
-              <p className="text-lg font-bold">Upload Image</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Drag and drop or browse from your device</p>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="focus-ring mt-4 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+        <form onSubmit={handleAnalyze} className="space-y-6">
+          <section className="rounded-3xl border border-slate-200 bg-white p-3 shadow-card dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+            <div className="grid gap-4 sm:gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <motion.aside
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-4"
               >
-                Browse Image
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onInput={(event) => {
-                  const file = event.currentTarget.files?.[0];
-                  if (file) {
-                    void setImageFile(file);
-                  }
-                }}
-              />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={startWebcam}
-                className="focus-ring rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                Use Webcam
-              </button>
-              <button
-                type="submit"
-                disabled={!selectedFile || isAnalyzing}
-                className="focus-ring rounded-xl bg-accent-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isAnalyzing ? 'Analyzing...' : 'Analyze Fit'}
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
-              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Pose Checklist</p>
-              <div className="mt-2 space-y-1.5 text-sm text-amber-800 dark:text-amber-200">
-                {POSE_REQUIREMENTS.map((tip) => (
-                  <p key={tip}>- {tip}</p>
-                ))}
-              </div>
-            </div>
-
-            {captureHints.length > 0 ? (
-              <div className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900/40 dark:bg-cyan-950/20">
-                <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">Capture Feedback</p>
-                <div className="mt-2 space-y-1.5 text-sm text-cyan-800 dark:text-cyan-200">
-                  {captureHints.map((hint) => (
-                    <p key={hint}>- {hint}</p>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              <p className="text-sm font-semibold">Fit Preference</p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                {(['slim', 'regular', 'relaxed'] as FitPreference[]).map((option) => (
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={(event) => {
+                    event.preventDefault();
+                    setIsDragging(false);
+                  }}
+                  onDrop={handleDrop}
+                  className={`rounded-2xl border-2 border-dashed p-6 text-center transition ${
+                    isDragging
+                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/20'
+                      : 'border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40'
+                  }`}
+                >
+                  <p className="text-lg font-bold">Upload or Drop Image</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">PNG, JPG, WEBP supported</p>
                   <button
-                    key={option}
                     type="button"
-                    onClick={() => setFitPreference(option)}
-                    className={`focus-ring rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${
-                      fitPreference === option
-                        ? 'border-brand-600 bg-brand-600 text-white'
-                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
-                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="focus-ring mt-4 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    {option}
+                    Browse Image
                   </button>
-                ))}
-              </div>
-            </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onInput={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      if (file) {
+                        void setImageFile(file);
+                      }
+                    }}
+                  />
+                </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              <p className="text-sm font-semibold">Brands</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {BRAND_OPTIONS.map((brand) => {
-                  const isSelected = selectedBrands.includes(brand);
+                <div className="grid gap-2 sm:gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                  <button
+                    type="button"
+                    onClick={startWebcam}
+                    className="focus-ring rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Use Webcam
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="focus-ring rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Replace Image
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!selectedFile || isAnalyzing}
+                    className="focus-ring rounded-xl bg-accent-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isAnalyzing ? 'Analyzing...' : 'Analyze Fit'}
+                  </button>
+                </div>
 
-                  return (
-                    <button
-                      key={brand}
-                      type="button"
-                      onClick={() => toggleBrand(brand)}
-                      className={`focus-ring rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                        isSelected
-                          ? 'border-brand-600 bg-brand-600 text-white'
-                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
-                      }`}
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40 sm:p-4">
+                  <p className="text-sm font-semibold">Demographics</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <select
+                      value={ageGroup}
+                      onChange={(event) => setAgeGroup(event.target.value as AgeGroup)}
+                      className="focus-ring rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                     >
-                      {brand}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                      <option value="child">Child</option>
+                      <option value="teen">Teen</option>
+                      <option value="adult">Adult</option>
+                    </select>
 
-            {isWebcamOpen ? (
-              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-                <video ref={videoRef} autoPlay playsInline muted className="aspect-[4/5] w-full rounded-xl bg-slate-900 object-cover" />
+                    <select
+                      value={gender}
+                      onChange={(event) => setGender(event.target.value as GenderCode)}
+                      className="focus-ring rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="unisex">Unisex</option>
+                    </select>
+                  </div>
+                </div>
 
-                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                    Capture Timer
-                  </p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {CAPTURE_TIMER_OPTIONS.map((seconds) => {
-                      const selected = captureTimerSec === seconds;
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40 sm:p-4">
+                  <p className="text-sm font-semibold">Fit Preference</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {(['slim', 'regular', 'relaxed'] as FitPreference[]).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setFitPreference(option)}
+                        className={`focus-ring rounded-xl border px-2 py-2 text-xs font-semibold capitalize transition sm:text-sm ${
+                          fitPreference === option
+                            ? 'border-brand-600 bg-brand-600 text-white'
+                            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40 sm:p-4">
+                  <p className="text-sm font-semibold">Brands</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {BRAND_OPTIONS.map((brand) => {
+                      const isSelected = selectedBrands.includes(brand);
                       return (
                         <button
-                          key={seconds}
+                          key={brand}
                           type="button"
-                          onClick={() => setCaptureTimerSec(seconds)}
-                          disabled={countdownSec !== null}
-                          className={`focus-ring rounded-lg border px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                            selected
+                          onClick={() => toggleBrand(brand)}
+                          className={`focus-ring rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                            isSelected
                               ? 'border-brand-600 bg-brand-600 text-white'
                               : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
                           }`}
                         >
-                          {seconds === 0 ? 'None' : `${seconds}s`}
+                          {brand}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={captureFromWebcam}
-                    disabled={countdownSec !== null}
-                    className="focus-ring rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    {countdownSec !== null
-                      ? `Capturing in ${countdownSec}s`
-                      : captureTimerSec === 0
-                        ? 'Capture'
-                        : `Capture in ${captureTimerSec}s`}
-                  </button>
+                {errorMessage ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
+                    {errorMessage}
+                  </div>
+                ) : null}
+              </motion.aside>
 
-                  {countdownSec !== null ? (
-                    <button
-                      type="button"
-                      onClick={cancelCaptureTimer}
-                      className="focus-ring rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/30"
-                    >
-                      Stop Timer
-                    </button>
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Live Preview</p>
+                  {selectedFile ? (
+                    <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                      Ready
+                    </span>
                   ) : null}
-
-                  <button
-                    type="button"
-                    onClick={stopWebcam}
-                    className="focus-ring rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    Cancel
-                  </button>
                 </div>
-              </div>
-            ) : null}
 
-            {errorMessage ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
-                {errorMessage}
-              </div>
-            ) : null}
-          </motion.section>
-
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900"
-          >
-            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Preview</p>
-            <div className="grid min-h-[26rem] place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              {previewUrl ? (
-                <img src={previewUrl} alt="Selected preview" className="h-full w-full rounded-xl object-cover" />
-              ) : (
-                <div className="text-center text-sm text-slate-500 dark:text-slate-400">
-                  Upload or capture an image to preview it here.
+                <div className="grid h-[18rem] place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 p-2 sm:h-[28rem] sm:p-3 lg:h-[34rem] dark:border-slate-700 dark:bg-slate-950/40">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt="Selected preview"
+                      className="max-h-full max-w-full rounded-xl object-contain"
+                    />
+                  ) : (
+                    <div className="text-center text-sm text-slate-500 dark:text-slate-400">
+                      Upload or capture an image to preview it here.
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {selectedFile ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
+                    Selected file: <span className="font-semibold">{selectedFile.name}</span>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/40 dark:bg-amber-950/20 sm:p-4">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Pose Checklist</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-amber-800 dark:text-amber-200">
+                      {POSE_REQUIREMENTS.map((tip) => (
+                        <li key={tip}>{tip}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-3 dark:border-cyan-900/40 dark:bg-cyan-950/20 sm:p-4">
+                    <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">Capture Feedback</p>
+                    <div className="mt-2 space-y-1.5 text-sm text-cyan-800 dark:text-cyan-200">
+                      {captureHints.length > 0 ? (
+                        captureHints.map((hint) => <p key={hint}>- {hint}</p>)
+                      ) : (
+                        <p>- Capture quality tips will appear after analysis starts.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {isWebcamOpen ? (
+                  <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40 sm:p-4">
+                    <video ref={videoRef} autoPlay playsInline muted className="aspect-[4/3] w-full rounded-xl bg-slate-900 object-cover sm:aspect-[16/9]" />
+
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                        Capture Timer
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {CAPTURE_TIMER_OPTIONS.map((seconds) => {
+                          const selected = captureTimerSec === seconds;
+                          return (
+                            <button
+                              key={seconds}
+                              type="button"
+                              onClick={() => setCaptureTimerSec(seconds)}
+                              disabled={countdownSec !== null}
+                              className={`focus-ring rounded-lg border px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                selected
+                                  ? 'border-brand-600 bg-brand-600 text-white'
+                                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                              }`}
+                            >
+                              {seconds === 0 ? 'None' : `${seconds}s`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={captureFromWebcam}
+                        disabled={countdownSec !== null}
+                        className="focus-ring rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                      >
+                        {countdownSec !== null
+                          ? `Capturing in ${countdownSec}s`
+                          : captureTimerSec === 0
+                            ? 'Capture'
+                            : `Capture in ${captureTimerSec}s`}
+                      </button>
+
+                      {countdownSec !== null ? (
+                        <button
+                          type="button"
+                          onClick={cancelCaptureTimer}
+                          className="focus-ring rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                        >
+                          Stop Timer
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={stopWebcam}
+                        className="focus-ring rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </motion.div>
             </div>
-            {selectedFile ? (
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Selected file: <span className="font-semibold">{selectedFile.name}</span>
-              </p>
-            ) : null}
-          </motion.section>
+          </section>
         </form>
 
         <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="text-2xl font-bold">Results Panel</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-2xl font-bold">Results Panel</h2>
+            {result ? (
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                Analysis Complete
+              </span>
+            ) : null}
+          </div>
 
           {isAnalyzing ? (
             <div className="grid gap-4 md:grid-cols-3">
@@ -578,7 +661,13 @@ export const DashboardPage = () => {
                     <p className="text-xs uppercase tracking-[0.12em] text-brand-100">Recommended</p>
                     <p className="mt-1 text-4xl font-extrabold">{result.predicted_size || '-'}</p>
                     <p className="text-sm text-brand-100">Confidence: {confidence}%</p>
+                    {result.size_range ? (
+                      <p className="mt-1 text-xs text-brand-100">Suggested range: {result.size_range}</p>
+                    ) : null}
                   </div>
+                  {result.prediction_advice ? (
+                    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{result.prediction_advice}</p>
+                  ) : null}
                 </article>
 
                 <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
@@ -591,6 +680,26 @@ export const DashboardPage = () => {
                       </div>
                     ))}
                   </div>
+                </article>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                  <p className="text-sm font-semibold">Fit Confidence</p>
+                  <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">{confidence}%</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Higher confidence means stronger measurement consistency.
+                  </p>
+                </article>
+
+                <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                  <p className="text-sm font-semibold">Return Risk</p>
+                  <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-50">
+                    {result.return_risk?.level ? toTitleCase(result.return_risk.level) : '-'}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Score: {result.return_risk?.score ?? '-'}
+                  </p>
                 </article>
               </div>
 

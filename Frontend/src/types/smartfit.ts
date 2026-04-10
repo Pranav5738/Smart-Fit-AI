@@ -4,6 +4,8 @@ export type FitPreference = 'slim' | 'regular' | 'relaxed';
 export type UnitSystem = 'in' | 'cm';
 export type LanguageCode = 'en' | 'es';
 export type ReturnRiskLevel = 'low' | 'medium' | 'high';
+export type AgeGroup = 'child' | 'teen' | 'adult';
+export type GenderCode = 'male' | 'female' | 'unisex';
 
 export interface RecommendationItem {
   name: string;
@@ -68,10 +70,20 @@ export interface BackendReturnRiskScore {
 
 export interface AnalyzeResponse {
   measurement_unit?: UnitSystem;
+  age_group?: AgeGroup;
+  gender?: GenderCode;
   measurements: Record<string, MeasurementValue>;
+  measurement_breakdown?: {
+    height_cm_used?: number;
+    pixel_debug?: Record<string, number>;
+  };
   fit_preference?: FitPreference;
   predicted_size: string;
   confidence: number;
+  confidence_components?: Record<string, number>;
+  prediction_confidence_level?: 'high' | 'medium' | 'low';
+  size_range?: string;
+  prediction_advice?: string;
   brand_mapping: Record<string, string>;
   recommendations: Array<string | RecommendationItem>;
   capture_quality?: {

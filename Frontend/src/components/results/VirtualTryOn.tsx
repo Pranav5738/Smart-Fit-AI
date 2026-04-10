@@ -70,7 +70,7 @@ export const VirtualTryOn = ({
             key={activeOption?.id || 'uploaded-preview'}
             src={activeImage}
             alt={activeOption?.label || 'Uploaded user'}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             initial={{ opacity: 0.2, scale: 1.02 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0.2, scale: 0.98 }}
@@ -97,15 +97,15 @@ export const VirtualTryOn = ({
     }
 
     return (
-      <div className="grid h-full grid-cols-2 gap-2">
+      <div className="grid h-full grid-cols-1 gap-2 sm:grid-cols-2">
         <div className="relative overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
-          <img src={uploadedPreview} alt="Original upload" className="h-full w-full object-cover" />
+          <img src={uploadedPreview} alt="Original upload" className="h-full w-full object-contain" />
           <span className="absolute left-2 top-2 rounded-md bg-slate-950/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white">
             Original
           </span>
         </div>
         <div className="relative overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
-          <img src={activeImage} alt="Try-on result" className="h-full w-full object-cover" />
+          <img src={activeImage} alt="Try-on result" className="h-full w-full object-contain" />
           <span className="absolute left-2 top-2 rounded-md bg-brand-700/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white">
             Try-On
           </span>
@@ -121,10 +121,10 @@ export const VirtualTryOn = ({
 
     return (
       <div className="relative h-full w-full overflow-hidden rounded-2xl">
-        <img src={uploadedPreview} alt="Original upload" className="h-full w-full object-cover" />
+        <img src={uploadedPreview} alt="Original upload" className="h-full w-full object-contain" />
 
         <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPercent}%` }}>
-          <img src={activeImage} alt="Try-on overlay" className="h-full w-full object-cover" />
+          <img src={activeImage} alt="Try-on overlay" className="h-full w-full object-contain" />
         </div>
 
         <div className="absolute bottom-4 left-4 right-4 rounded-xl bg-white/90 p-2 shadow-card dark:bg-slate-900/85">
@@ -156,19 +156,19 @@ export const VirtualTryOn = ({
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900">
-      <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="mb-5 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700 dark:text-brand-300">Virtual Fitting</p>
-          <h3 className="text-2xl font-bold">Virtual Try-On Preview</h3>
+          <h3 className="text-xl font-bold sm:text-2xl">Virtual Try-On Preview</h3>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:flex-wrap">
           {(['single', 'side-by-side', 'slider'] as ComparisonMode[]).map((mode) => (
             <button
               key={mode}
               type="button"
               onClick={() => setComparisonMode(mode)}
-              className={`focus-ring rounded-xl px-3 py-2 text-xs font-semibold transition ${
+              className={`focus-ring rounded-xl px-3 py-2 text-[11px] font-semibold transition sm:text-xs ${
                 comparisonMode === mode
                   ? 'bg-brand-600 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
@@ -184,14 +184,14 @@ export const VirtualTryOn = ({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="relative rounded-3xl border border-slate-200 bg-slate-100 p-3 dark:border-slate-700 dark:bg-slate-950">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-200 to-brand-100 dark:from-slate-900 dark:to-brand-950">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+        <div className="relative w-full rounded-3xl border border-slate-200 bg-slate-100 p-3 dark:border-slate-700 dark:bg-slate-950">
+          <div className="relative h-[20rem] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-200 to-brand-100 sm:h-[30rem] lg:h-[34rem] dark:from-slate-900 dark:to-brand-950">
             {renderComparison()}
           </div>
           {uploadedPreview ? (
             <div className="absolute bottom-5 right-5 w-24 overflow-hidden rounded-xl border border-slate-300 shadow-card dark:border-slate-700">
-              <img src={uploadedPreview} alt="Original upload" className="aspect-[3/4] w-full object-cover" />
+              <img src={uploadedPreview} alt="Original upload" className="aspect-[3/4] w-full object-contain" />
             </div>
           ) : null}
         </div>

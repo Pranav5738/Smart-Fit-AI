@@ -15,16 +15,25 @@ class MeasurementConversionService:
         pixel_measurements: Dict[str, float],
         body_height_px: float,
         user_height_cm: Optional[float] = None,
+        age_group: str = "adult",
     ) -> Dict[str, float]:
         if body_height_px <= 1.0:
             raise MeasurementConversionError(
                 "Body height in pixels is too small for conversion."
             )
 
+        age_group_defaults = {
+            "child": 125.0,
+            "teen": 155.0,
+            "adult": self.default_user_height_cm,
+        }
+        normalized_age_group = (age_group or "adult").strip().lower()
+        fallback_height = age_group_defaults.get(normalized_age_group, self.default_user_height_cm)
+
         effective_height_cm = (
             user_height_cm
             if user_height_cm is not None and user_height_cm > 80
-            else self.default_user_height_cm
+            else fallback_height
         )
 
         cm_per_pixel = effective_height_cm / body_height_px

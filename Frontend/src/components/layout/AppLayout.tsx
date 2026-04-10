@@ -161,7 +161,7 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="relative min-h-screen overflow-x-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <a
         href="#main-content"
         className="focus-ring absolute left-3 top-3 z-[70] -translate-y-16 rounded-xl bg-brand-700 px-3 py-2 text-sm font-semibold text-white transition focus:translate-y-0"
@@ -176,15 +176,15 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
 
       <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/70">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <NavLink to={isAuthenticated ? '/dashboard' : '/'} className="flex items-center gap-3">
+          <NavLink to={isAuthenticated ? '/dashboard' : '/'} className="flex items-center gap-2.5 sm:gap-3">
             <img
               src="/smartfit-logo-mark.svg"
               alt="SmartFit AI"
-              className="h-9 w-9 rounded-xl border border-sky-200/60 object-cover shadow-soft dark:border-sky-700/40"
+              className="h-8 w-8 rounded-xl border border-sky-200/60 object-cover shadow-soft dark:border-sky-700/40 sm:h-9 sm:w-9"
             />
             <div>
-              <p className="font-heading text-lg font-bold">SmartFit AI</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">AI-Powered Size Intelligence</p>
+              <p className="font-heading text-base font-bold sm:text-lg">SmartFit AI</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">AI-Powered Size Intelligence</p>
             </div>
           </NavLink>
 
@@ -226,7 +226,7 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
                     role="menu"
                     aria-label={t('Settings menu', 'Menu de ajustes')}
                     onKeyDown={handleSettingsPanelKeyDown}
-                    className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-card backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95"
+                    className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-card backdrop-blur-xl sm:w-80 dark:border-slate-800 dark:bg-slate-900/95"
                   >
                     <div className="mb-3 flex items-center justify-between rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/85">
                       <div>
@@ -360,6 +360,25 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
             )}
           </div>
         </div>
+
+        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 pb-3 md:hidden sm:px-6">
+          {visibleLinks.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              aria-label={link.label}
+              className={({ isActive }) =>
+                `focus-ring shrink-0 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                  isActive
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                }`
+              }
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </div>
       </header>
 
       <motion.main
@@ -367,7 +386,7 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
+        className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8"
       >
         {children}
       </motion.main>

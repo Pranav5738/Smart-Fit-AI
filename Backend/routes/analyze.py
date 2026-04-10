@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
-from models.schemas import AnalyzeImageResponse, FitPreference, LanguageCode, UnitSystem
+from models.schemas import AgeGroup, AnalyzeImageResponse, FitPreference, GenderCode, LanguageCode, UnitSystem
 from services.pipeline import get_pipeline
 from services.profile_store import ProfileStoreService
 from utils.config import get_settings
@@ -37,6 +37,14 @@ async def analyze_image(
     fit_preference: FitPreference = Form(
         default="regular",
         description="Fit preference: slim, regular, relaxed",
+    ),
+    age_group: AgeGroup = Form(
+        default="adult",
+        description="Target age group: child, teen, or adult",
+    ),
+    gender: GenderCode = Form(
+        default="unisex",
+        description="Body profile: male, female, or unisex",
     ),
     unit_system: UnitSystem = Form(
         default="cm",
@@ -102,6 +110,8 @@ async def analyze_image(
         result = get_pipeline().analyze_image(
             image_bytes=image_bytes,
             user_height_cm=user_height_cm,
+            age_group=age_group,
+            gender=gender,
             fit_preference=fit_preference,
             unit_system=unit_system,
             language=language,

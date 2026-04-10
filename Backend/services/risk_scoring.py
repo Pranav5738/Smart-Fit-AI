@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from services.size_predictor import SIZE_ORDER
+from services.size_predictor import infer_size_order
 
 
 class ReturnRiskService:
@@ -75,9 +75,10 @@ class ReturnRiskService:
     @staticmethod
     def _shift_size(base_size: str, shift: int) -> str:
         normalized = base_size.upper().strip()
-        if normalized not in SIZE_ORDER:
+        size_order = infer_size_order(base_size)
+        if normalized not in size_order:
             return base_size
 
-        start_index = SIZE_ORDER.index(normalized)
-        shifted_index = min(max(start_index + shift, 0), len(SIZE_ORDER) - 1)
-        return SIZE_ORDER[shifted_index]
+        start_index = size_order.index(normalized)
+        shifted_index = min(max(start_index + shift, 0), len(size_order) - 1)
+        return size_order[shifted_index]

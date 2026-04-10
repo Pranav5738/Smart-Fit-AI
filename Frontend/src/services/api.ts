@@ -1,8 +1,10 @@
 import axios, { AxiosError } from 'axios';
 import {
+  AgeGroup,
   AnalyzeResponse,
   CaptureQualityReport,
   FitPreference,
+  GenderCode,
   LanguageCode,
   RecommendationItem,
   UnitSystem,
@@ -35,6 +37,8 @@ export const getConfiguredAccessToken = (): string | null => activeAccessToken;
 interface AnalyzeImageOptions {
   fitPreference?: FitPreference;
   userHeightCm?: number;
+  ageGroup?: AgeGroup;
+  gender?: GenderCode;
   profileId?: string;
   saveToHistory?: boolean;
   consentAccepted?: boolean;
@@ -244,6 +248,8 @@ export const analyzeImage = async (
   formData.append('image', imageFile);
 
   formData.append('fit_preference', options?.fitPreference || 'regular');
+  formData.append('age_group', options?.ageGroup || 'adult');
+  formData.append('gender', options?.gender || 'unisex');
   formData.append('unit_system', options?.unitSystem || 'in');
   formData.append('language', options?.language || 'en');
   formData.append(

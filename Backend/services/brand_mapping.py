@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.size_predictor import infer_size_order
+
 SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL"]
 
 
@@ -102,26 +104,33 @@ class BrandMappingService:
         include_offset: bool = False,
     ) -> Any:
         normalized_base = self._normalize_size(base_size)
-        base_index = SIZE_ORDER.index(normalized_base) if normalized_base in SIZE_ORDER else SIZE_ORDER.index("M")
+        size_order = infer_size_order(normalized_base)
+        if normalized_base not in size_order:
+            mapped_size = normalized_base
+            return (mapped_size, 0) if include_offset else mapped_size
+
+        base_index = size_order.index(normalized_base)
 
         rules = self.brand_rules.get(brand)
         if rules is None:
-            mapped_size = SIZE_ORDER[base_index]
+            mapped_size = size_order[base_index]
             return (mapped_size, 0) if include_offset else mapped_size
 
-        base_offset = int(rules.get("base_offset", 0))
+        is_adult_size = normalized_base in SIZE_ORDER
+        base_offset = int(rules.get("base_offset", 0)) if is_adult_size else 0
         fit_offset = int(rules.get("fit_adjustments", {}).get(fit_preference, 0))
-        category_offset = int(rules.get("category_offsets", {}).get(category, 0))
+        category_offset = int(rules.get("category_offsets", {}).get(category, 0)) if is_adult_size else 0
         total_offset = base_offset + fit_offset + category_offset
 
-        mapped_index = min(max(base_index + total_offset, 0), len(SIZE_ORDER) - 1)
-        mapped_size = SIZE_ORDER[mapped_index]
+        mapped_index = min(max(base_index + total_offset, 0), len(size_order) - 1)
+        mapped_size = size_order[mapped_index]
         return (mapped_size, total_offset) if include_offset else mapped_size
 
     @staticmethod
     def _normalize_size(size_label: str) -> str:
         normalized = size_label.upper().strip()
-        return normalized if normalized in SIZE_ORDER else "M"
+        inferred_order = infer_size_order(normalized)
+        return normalized if normalized in inferred_order else normalized
 
     @staticmethod
     def _adjustment_reason(offset: int) -> str:

@@ -15,6 +15,8 @@ class ExplainabilityService:
         fit_preference: str,
         capture_quality: dict[str, Any],
         brand_adjustment_logic: list[dict[str, Any]],
+        age_group: str = "adult",
+        gender: str = "unisex",
     ) -> dict[str, Any]:
         confidence_percent = confidence * 100.0 if confidence <= 1.0 else confidence
 
@@ -55,8 +57,8 @@ class ExplainabilityService:
             )
 
         size_reasoning = (
-            f"Size {predicted_size} best matches chest, waist, and shoulder proportions "
-            f"for the selected {fit_preference} preference."
+            f"Predicted {predicted_size} because chest, waist, and shoulder values align with "
+            f"the {age_group} {gender} profile ranges and the selected {fit_preference} fit preference."
         )
 
         return {

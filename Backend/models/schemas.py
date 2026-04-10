@@ -8,6 +8,8 @@ FitPreference = Literal["slim", "regular", "relaxed"]
 UnitSystem = Literal["cm", "in"]
 LanguageCode = Literal["en", "es"]
 RiskLevel = Literal["low", "medium", "high"]
+AgeGroup = Literal["child", "teen", "adult"]
+GenderCode = Literal["male", "female", "unisex"]
 
 
 class Measurements(BaseModel):
@@ -91,10 +93,17 @@ class PrivacySummary(BaseModel):
 
 class AnalyzeImageResponse(BaseModel):
     measurement_unit: UnitSystem
+    age_group: AgeGroup = "adult"
+    gender: GenderCode = "unisex"
     measurements: Measurements
+    measurement_breakdown: Dict[str, Any] | None = None
     fit_preference: FitPreference
     predicted_size: str
     confidence: float = Field(..., ge=0.0, le=1.0)
+    confidence_components: Dict[str, float] | None = None
+    prediction_confidence_level: Literal["high", "medium", "low"] | None = None
+    size_range: str | None = None
+    prediction_advice: str | None = None
     brand_mapping: Dict[str, str]
     recommendations: List[RecommendationItem]
     capture_quality: CaptureQualityReport
