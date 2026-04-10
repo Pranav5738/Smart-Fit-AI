@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 import cv2
-import mediapipe as mp
 import numpy as np
 
 from utils.logger import get_logger
@@ -19,6 +19,8 @@ class CaptureQualityService:
         min_detection_confidence: float = 0.45,
         min_tracking_confidence: float = 0.45,
     ) -> None:
+        import mediapipe as mp
+
         self._mp_pose = mp.solutions.pose
         self._pose = self._mp_pose.Pose(
             static_image_mode=True,
@@ -164,3 +166,8 @@ class CaptureQualityService:
 
         lookup = spanish_hints if language.lower() == "es" else english_hints
         return lookup.get(hint_key, english_hints.get(hint_key, "Improve image capture quality."))
+
+
+@lru_cache(maxsize=1)
+def get_capture_quality_service() -> CaptureQualityService:
+    return CaptureQualityService()

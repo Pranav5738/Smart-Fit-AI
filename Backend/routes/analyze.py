@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from models.schemas import AnalyzeImageResponse, FitPreference, LanguageCode, UnitSystem
-from services.pipeline import SmartFitPipeline
+from services.pipeline import get_pipeline
 from services.profile_store import ProfileStoreService
 from utils.config import get_settings
 from utils.exceptions import SmartFitError
@@ -12,7 +12,6 @@ from utils.logger import get_logger
 router = APIRouter(tags=["SmartFit"])
 logger = get_logger(__name__)
 settings = get_settings()
-pipeline = SmartFitPipeline()
 profile_store = ProfileStoreService(db_path=settings.data_store_path)
 
 
@@ -100,7 +99,7 @@ async def analyze_image(
         )
 
     try:
-        result = pipeline.analyze_image(
+        result = get_pipeline().analyze_image(
             image_bytes=image_bytes,
             user_height_cm=user_height_cm,
             fit_preference=fit_preference,

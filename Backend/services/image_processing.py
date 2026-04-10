@@ -1,8 +1,8 @@
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Dict, Tuple
 
 import cv2
-import mediapipe as mp
 import numpy as np
 
 from utils.exceptions import LandmarkDetectionError
@@ -24,6 +24,8 @@ class ImageProcessingService:
         min_tracking_confidence: float = 0.5,
         min_landmark_visibility: float = 0.35,
     ) -> None:
+        import mediapipe as mp
+
         self._mp_pose = mp.solutions.pose
         self._min_landmark_visibility = min_landmark_visibility
         self._pose = self._mp_pose.Pose(
@@ -150,3 +152,8 @@ class ImageProcessingService:
                 raise LandmarkDetectionError(
                     "Pose detected but key landmarks are unclear. Retake with full body visible (head to ankles), stand straight facing camera, keep arms slightly away from torso, and use bright front lighting."
                 )
+
+
+@lru_cache(maxsize=1)
+def get_image_processing_service() -> ImageProcessingService:
+    return ImageProcessingService()

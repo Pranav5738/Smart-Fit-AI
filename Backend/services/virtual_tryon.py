@@ -1,4 +1,5 @@
 import base64
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -218,3 +219,8 @@ class VirtualTryOnService:
             raise TryOnGenerationError(
                 f"Missing torso landmarks for virtual try-on: {missing_points}."
             )
+
+
+@lru_cache(maxsize=1)
+def get_virtual_tryon_service(assets_dir: Path) -> VirtualTryOnService:
+    return VirtualTryOnService(assets_dir=assets_dir)

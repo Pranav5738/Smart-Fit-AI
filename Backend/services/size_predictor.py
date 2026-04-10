@@ -1,4 +1,5 @@
 from pathlib import Path
+from functools import lru_cache
 from typing import Dict, Tuple
 
 import numpy as np
@@ -203,3 +204,8 @@ class SizePredictorService:
         current_index = SIZE_ORDER.index(normalized)
         next_index = min(max(current_index + shift, 0), len(SIZE_ORDER) - 1)
         return SIZE_ORDER[next_index]
+
+
+@lru_cache(maxsize=1)
+def get_size_predictor_service(model_path: Path) -> SizePredictorService:
+    return SizePredictorService(model_path=model_path)

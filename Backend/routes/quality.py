@@ -3,12 +3,10 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from models.schemas import LanguageCode, QualityCheckResponse
-from services.image_processing import ImageProcessingService
-from services.quality_checker import CaptureQualityService
+from services.image_processing import get_image_processing_service
+from services.quality_checker import get_capture_quality_service
 
 router = APIRouter(tags=["Quality"])
-image_processing = ImageProcessingService()
-quality_checker = CaptureQualityService()
 
 
 @router.post(
@@ -33,6 +31,8 @@ async def quality_check(
             detail="Uploaded image is empty.",
         )
 
+    image_processing = get_image_processing_service()
+    quality_checker = get_capture_quality_service()
     image_bgr = image_processing.decode_image(image_bytes)
     report = quality_checker.assess(image_bgr=image_bgr, language=language)
 
