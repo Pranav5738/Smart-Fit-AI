@@ -46,7 +46,8 @@ class SmartFitPipeline:
 
     def analyze_image(
         self,
-        image_bytes: bytes,
+        front_image_bytes: bytes,
+        side_image_bytes: bytes,
         user_height_cm: Optional[float] = None,
         age_group: str = "adult",
         gender: str = "unisex",
@@ -54,22 +55,48 @@ class SmartFitPipeline:
         unit_system: str = "cm",
         language: str = "en",
         categories: list[str] | None = None,
+        preferred_brands: list[str] | None = None,
         occasions: list[str] | None = None,
         weather: list[str] | None = None,
         colors: list[str] | None = None,
         include_tryon_comparison: bool = True,
+        extra_front_image_bytes: list[bytes] | None = None,
+        extra_side_image_bytes: list[bytes] | None = None,
         capture_quality: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        image_bgr = self.image_processing.decode_image(image_bytes)
-        quality_report = capture_quality or self.quality_checker.assess(image_bgr, language=language)
+        front_images = [front_image_bytes] + list(extra_front_image_bytes or [])
+        side_images = [side_image_bytes] + list(extra_side_image_bytes or [])
 
-        pose_result = self.image_processing.extract_measurements(image_bgr)
+        front_results = [
+            self.image_processing.extract_measurements(
+                self.image_processing.decode_image(image_bytes),
+                view="front",
+            )
+            for image_bytes in front_images
+        ]
+        side_results = [
+            self.image_processing.extract_measurements(
+                self.image_processing.decode_image(image_bytes),
+                view="side",
+            )
+            for image_bytes in side_images
+        ]
+
+        front_result = self._aggregate_pose_results(front_results)
+        side_result = self._aggregate_pose_results(side_results)
+
+        primary_front_bgr = self.image_processing.decode_image(front_image_bytes)
+        quality_report = capture_quality or self.quality_checker.assess(primary_front_bgr, language=language)
 
         measurements_cm = self.measurement_conversion.convert_to_cm(
-            pixel_measurements=pose_result.pixel_measurements,
-            body_height_px=pose_result.body_height_px,
+            front_pixel_measurements=front_result.pixel_measurements,
+            side_pixel_measurements=side_result.pixel_measurements,
+            front_body_height_px=front_result.body_height_px,
+            side_body_height_px=side_result.body_height_px,
             user_height_cm=user_height_cm,
             age_group=age_group,
+            front_debug=front_result.measurement_debug,
+            side_debug=side_result.measurement_debug,
         )
 
         base_size, base_confidence = self.size_predictor.predict(
@@ -86,8 +113,11 @@ class SmartFitPipeline:
 
         confidence_details = self._compute_confidence_details(
             base_confidence=base_confidence,
-            pose_quality=pose_result.pose_quality,
+            front_pose_quality=front_result.pose_quality,
+            side_pose_quality=side_result.pose_quality,
             capture_quality=quality_report,
+            front_frame_count=len(front_results),
+            side_frame_count=len(side_results),
         )
         confidence = confidence_details["final_confidence"]
 
@@ -104,15 +134,36 @@ class SmartFitPipeline:
             fit_preference=fit_preference,
             brand_mapper=self.brand_mapping,
             categories=categories,
+            preferred_brands=preferred_brands,
             occasions=occasions,
             weather=weather,
             colors=colors,
             limit=8,
         )
 
+        preferred_brand_set = {brand.strip().lower() for brand in preferred_brands or [] if brand.strip()}
+        nike_size_suggestions = (
+            self.brand_mapping.nike_top_bottom_suggestions(
+                measurements_cm=measurements_cm,
+                fit_preference=fit_preference,
+                gender=gender,
+            )
+            if "nike" in preferred_brand_set
+            else None
+        )
+        zara_size_suggestions = (
+            self.brand_mapping.zara_top_bottom_suggestions(
+                measurements_cm=measurements_cm,
+                fit_preference=fit_preference,
+                gender=gender,
+            )
+            if "zara" in preferred_brand_set
+            else None
+        )
+
         tryon_outputs = self.virtual_tryon.generate_tryon_outputs(
-            image_bgr=image_bgr,
-            torso_points=pose_result.torso_points,
+            image_bgr=primary_front_bgr,
+            torso_points=front_result.torso_points,
             include_comparison=include_tryon_comparison,
         )
 
@@ -163,7 +214,11 @@ class SmartFitPipeline:
                     else {"child": 125.0, "teen": 155.0, "adult": self.measurement_conversion.default_user_height_cm}.get(age_group, self.measurement_conversion.default_user_height_cm),
                     2,
                 ),
-                "pixel_debug": pose_result.measurement_debug,
+                "pixel_debug": front_result.measurement_debug,
+                "front_pixel_debug": front_result.measurement_debug,
+                "side_pixel_debug": side_result.measurement_debug,
+                "front_frames_used": len(front_results),
+                "side_frames_used": len(side_results),
             },
             "fit_preference": fit_preference,
             "predicted_size": predicted_size,
@@ -173,6 +228,8 @@ class SmartFitPipeline:
             "size_range": size_range,
             "prediction_advice": prediction_advice,
             "brand_mapping": brand_mapping,
+            "nike_size_suggestions": nike_size_suggestions,
+            "zara_size_suggestions": zara_size_suggestions,
             "recommendations": recommendations,
             "capture_quality": quality_report,
             "explainability": explainability,
@@ -190,15 +247,52 @@ class SmartFitPipeline:
     @staticmethod
     def _compute_confidence_details(
         base_confidence: float,
-        pose_quality: dict[str, float],
+        front_pose_quality: dict[str, float],
+        side_pose_quality: dict[str, float],
         capture_quality: dict[str, Any],
+        front_frame_count: int,
+        side_frame_count: int,
     ) -> dict[str, float]:
-        pose_quality_score = float(np.clip(float(pose_quality.get("overall_score", 70.0)) / 100.0, 0.0, 1.0))
-        landmark_visibility = float(np.clip(float(pose_quality.get("visibility_score", 70.0)) / 100.0, 0.0, 1.0))
-        measurement_consistency = float(np.clip(float(pose_quality.get("measurement_consistency", 70.0)) / 100.0, 0.0, 1.0))
+        front_pose_score = float(np.clip(float(front_pose_quality.get("overall_score", 70.0)) / 100.0, 0.0, 1.0))
+        side_pose_score = float(np.clip(float(side_pose_quality.get("overall_score", 65.0)) / 100.0, 0.0, 1.0))
+        pose_quality_score = (front_pose_score * 0.65) + (side_pose_score * 0.35)
+
+        landmark_visibility = float(
+            np.clip(
+                (
+                    float(front_pose_quality.get("visibility_score", 70.0)) * 0.65
+                    + float(side_pose_quality.get("visibility_score", 65.0)) * 0.35
+                )
+                / 100.0,
+                0.0,
+                1.0,
+            )
+        )
+        measurement_consistency = float(
+            np.clip(
+                (
+                    float(front_pose_quality.get("measurement_consistency", 70.0)) * 0.6
+                    + float(side_pose_quality.get("measurement_consistency", 65.0)) * 0.4
+                )
+                / 100.0,
+                0.0,
+                1.0,
+            )
+        )
         demographic_match_confidence = float(np.clip(base_confidence, 0.0, 1.0))
 
         quality_guard = float(np.clip(float(capture_quality.get("overall_score", 75.0)) / 100.0, 0.0, 1.0))
+        low_resolution_penalty = float(
+            np.clip(1.0 - (float(front_pose_quality.get("resolution_score", 75.0)) / 100.0), 0.0, 0.22)
+        )
+        side_pose_penalty = float(np.clip(1.0 - side_pose_score, 0.0, 0.24))
+        missing_side_penalty = 0.18 if side_frame_count <= 0 else 0.0
+
+        frame_bonus = 0.0
+        if front_frame_count > 1:
+            frame_bonus += min(0.03, (front_frame_count - 1) * 0.01)
+        if side_frame_count > 1:
+            frame_bonus += min(0.03, (side_frame_count - 1) * 0.01)
 
         weighted = (
             0.4 * pose_quality_score
@@ -206,7 +300,20 @@ class SmartFitPipeline:
             + 0.2 * measurement_consistency
             + 0.1 * demographic_match_confidence
         )
-        final_confidence = float(np.clip(weighted * (0.82 + (0.18 * quality_guard)), 0.35, 0.99))
+        final_confidence = float(
+            np.clip(
+                (weighted * (0.82 + (0.18 * quality_guard))) - low_resolution_penalty - side_pose_penalty + frame_bonus,
+                0.30,
+                0.99,
+            )
+        )
+        final_confidence = float(
+            np.clip(
+                final_confidence - missing_side_penalty,
+                0.30,
+                0.99,
+            )
+        )
 
         return {
             "pose_quality": round(pose_quality_score, 4),
@@ -214,8 +321,40 @@ class SmartFitPipeline:
             "measurement_consistency": round(measurement_consistency, 4),
             "demographic_match_confidence": round(demographic_match_confidence, 4),
             "quality_guard": round(quality_guard, 4),
+            "low_resolution_penalty": round(low_resolution_penalty, 4),
+            "side_pose_penalty": round(side_pose_penalty, 4),
+            "missing_side_penalty": round(missing_side_penalty, 4),
+            "frame_bonus": round(frame_bonus, 4),
             "final_confidence": round(final_confidence, 4),
         }
+
+    @staticmethod
+    def _aggregate_pose_results(results: list[Any]) -> Any:
+        if not results:
+            raise ValueError("No pose extraction results available for aggregation.")
+        if len(results) == 1:
+            return results[0]
+
+        base = results[0]
+        keys = set(base.pixel_measurements.keys())
+        averaged_measurements = {
+            key: float(np.mean([result.pixel_measurements.get(key, 0.0) for result in results]))
+            for key in keys
+        }
+        averaged_pose_quality = {
+            key: float(np.mean([result.pose_quality.get(key, 0.0) for result in results]))
+            for key in base.pose_quality.keys()
+        }
+        averaged_debug = {
+            key: float(np.mean([result.measurement_debug.get(key, 0.0) for result in results]))
+            for key in base.measurement_debug.keys()
+        }
+
+        base.pixel_measurements = averaged_measurements
+        base.body_height_px = float(np.mean([result.body_height_px for result in results]))
+        base.pose_quality = averaged_pose_quality
+        base.measurement_debug = averaged_debug
+        return base
 
     @staticmethod
     def _confidence_level(confidence: float) -> str:

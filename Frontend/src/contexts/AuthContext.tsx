@@ -211,7 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = useCallback(async (payload: RegisterPayload) => {
     const trimmedName = payload.name.trim();
     const normalizedEmail = normalizeEmail(payload.email);
-    const trimmedPassword = payload.password.trim();
+    const providedPassword = payload.password;
 
     if (!trimmedName) {
       throw new Error('Name is required.');
@@ -222,11 +222,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const hasStrongPassword =
-      trimmedPassword.length >= 8 &&
-      /[a-z]/.test(trimmedPassword) &&
-      /[A-Z]/.test(trimmedPassword) &&
-      /\d/.test(trimmedPassword) &&
-      /[^A-Za-z0-9]/.test(trimmedPassword);
+      providedPassword.length >= 8 &&
+      /[a-z]/.test(providedPassword) &&
+      /[A-Z]/.test(providedPassword) &&
+      /\d/.test(providedPassword) &&
+      /[^A-Za-z0-9]/.test(providedPassword);
 
     if (!hasStrongPassword) {
       throw new Error(
@@ -246,7 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await registerAuthUser({
       name: trimmedName,
       email: normalizedEmail,
-      password: trimmedPassword,
+      password: providedPassword,
       heightCm: payload.heightCm,
       weightKg: payload.weightKg,
       })
@@ -258,14 +258,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = useCallback(async (email: string, password: string, rememberMe = false) => {
     const normalizedEmail = normalizeEmail(email);
-    const trimmedPassword = password.trim();
+    const providedPassword = password;
 
-    if (!normalizedEmail || !trimmedPassword) {
+    if (!normalizedEmail || providedPassword.length === 0) {
       throw new Error('Email and password are required.');
     }
 
     const authenticatedSession = toAuthSessionState(
-      await signInAuthUser(normalizedEmail, trimmedPassword)
+      await signInAuthUser(normalizedEmail, providedPassword)
     );
 
     setSession(authenticatedSession);

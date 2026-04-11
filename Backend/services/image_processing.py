@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -15,6 +15,7 @@ class PoseExtractionResult:
     torso_points: Dict[str, Tuple[int, int]]
     pose_quality: Dict[str, float]
     measurement_debug: Dict[str, float]
+    view: str
 
 
 class ImageProcessingService:
@@ -47,7 +48,11 @@ class ImageProcessingService:
 
         return image_bgr
 
-    def extract_measurements(self, image_bgr: np.ndarray) -> PoseExtractionResult:
+    def extract_measurements(self, image_bgr: np.ndarray, view: str = "front") -> PoseExtractionResult:
+        normalized_view = (view or "front").strip().lower()
+        if normalized_view not in {"front", "side"}:
+            normalized_view = "front"
+
         image_height, image_width = image_bgr.shape[:2]
         if min(image_height, image_width) < 420:
             raise LandmarkDetectionError(
@@ -64,47 +69,71 @@ class ImageProcessingService:
 
         landmarks = results.pose_landmarks.landmark
 
-        self._ensure_visible(
-            landmarks,
-            [
-                self._mp_pose.PoseLandmark.NOSE.value,
-                self._mp_pose.PoseLandmark.LEFT_SHOULDER.value,
-                self._mp_pose.PoseLandmark.RIGHT_SHOULDER.value,
-                self._mp_pose.PoseLandmark.LEFT_HIP.value,
-                self._mp_pose.PoseLandmark.RIGHT_HIP.value,
-                self._mp_pose.PoseLandmark.LEFT_ANKLE.value,
-                self._mp_pose.PoseLandmark.RIGHT_ANKLE.value,
-            ],
-        )
+        if normalized_view == "front":
+            self._ensure_visible(
+                landmarks,
+                [
+                    self._mp_pose.PoseLandmark.NOSE.value,
+                    self._mp_pose.PoseLandmark.LEFT_SHOULDER.value,
+                    self._mp_pose.PoseLandmark.RIGHT_SHOULDER.value,
+                    self._mp_pose.PoseLandmark.LEFT_HIP.value,
+                    self._mp_pose.PoseLandmark.RIGHT_HIP.value,
+                    self._mp_pose.PoseLandmark.LEFT_ANKLE.value,
+                    self._mp_pose.PoseLandmark.RIGHT_ANKLE.value,
+                ],
+            )
 
-        left_shoulder = self._point(
+        left_shoulder = self._optional_point(
             landmarks, self._mp_pose.PoseLandmark.LEFT_SHOULDER.value, image_width, image_height
         )
-        right_shoulder = self._point(
+        right_shoulder = self._optional_point(
             landmarks, self._mp_pose.PoseLandmark.RIGHT_SHOULDER.value, image_width, image_height
         )
-        left_elbow = self._point(
+        left_elbow = self._optional_point(
             landmarks, self._mp_pose.PoseLandmark.LEFT_ELBOW.value, image_width, image_height
         )
-        right_elbow = self._point(
+        right_elbow = self._optional_point(
             landmarks, self._mp_pose.PoseLandmark.RIGHT_ELBOW.value, image_width, image_height
         )
-        left_hip = self._point(
+        left_hip = self._optional_point(
             landmarks, self._mp_pose.PoseLandmark.LEFT_HIP.value, image_width, image_height
         )
-        right_hip = self._point(
+        right_hip = self._optional_point(
             landmarks, self._mp_pose.PoseLandmark.RIGHT_HIP.value, image_width, image_height
         )
+
+        if not any([left_shoulder is not None, right_shoulder is not None]):
+            raise LandmarkDetectionError("Shoulders are not visible clearly. Retake with body centered.")
+        if not any([left_hip is not None, right_hip is not None]):
+            raise LandmarkDetectionError("Hips are not visible clearly. Retake with full body visible.")
+
+        left_shoulder = left_shoulder or right_shoulder
+        right_shoulder = right_shoulder or left_shoulder
+        left_hip = left_hip or right_hip
+        right_hip = right_hip or left_hip
+        left_elbow = left_elbow or left_shoulder
+        right_elbow = right_elbow or right_shoulder
+
+        assert left_shoulder is not None and right_shoulder is not None
+        assert left_hip is not None and right_hip is not None
+        assert left_elbow is not None and right_elbow is not None
 
         nose = self._point(
             landmarks, self._mp_pose.PoseLandmark.NOSE.value, image_width, image_height
         )
-        left_ankle = self._point(
+        left_ankle = self._optional_point(
             landmarks, self._mp_pose.PoseLandmark.LEFT_ANKLE.value, image_width, image_height
         )
-        right_ankle = self._point(
+        right_ankle = self._optional_point(
             landmarks, self._mp_pose.PoseLandmark.RIGHT_ANKLE.value, image_width, image_height
         )
+
+        if left_ankle is None and right_ankle is None:
+            raise LandmarkDetectionError("Full body is not visible. Keep ankles in frame.")
+
+        left_ankle = left_ankle or right_ankle
+        right_ankle = right_ankle or left_ankle
+        assert left_ankle is not None and right_ankle is not None
 
         chest_left = self._interpolate(left_shoulder, left_hip, 0.28)
         chest_right = self._interpolate(right_shoulder, right_hip, 0.28)
@@ -186,13 +215,47 @@ class ImageProcessingService:
                 100.0,
             )
         )
-        pose_quality_score = float(
-            np.clip((visibility_score * 0.45) + (symmetry_score * 0.35) + (posture_score * 0.20), 0.0, 100.0)
+
+        full_body_score = float(np.clip(((ankle_center_y - nose[1]) / max(float(image_height), 1.0)) * 100.0, 0.0, 100.0))
+        tilt_degrees = float(
+            np.degrees(
+                np.arctan2(
+                    abs(float(shoulder_center[0] - hip_center[0])),
+                    max(abs(float(shoulder_center[1] - hip_center[1])), 1.0),
+                )
+            )
         )
+        resolution_score = float(np.clip((min(image_height, image_width) / 1080.0) * 100.0, 0.0, 100.0))
+        pose_quality_score = float(
+            np.clip(
+                (visibility_score * 0.32)
+                + (symmetry_score * 0.23)
+                + (posture_score * 0.20)
+                + (full_body_score * 0.15)
+                + (resolution_score * 0.10),
+                0.0,
+                100.0,
+            )
+        )
+
+        if full_body_score < 58.0:
+            raise LandmarkDetectionError(
+                "Full body not visible. Keep head-to-ankles in frame for accurate sizing."
+            )
+
+        if tilt_degrees > 20.0:
+            raise LandmarkDetectionError(
+                "Body tilt is too high. Stand straight and face camera for accurate sizing."
+            )
 
         if visibility_score < 38.0 or symmetry_score < 32.0:
             raise LandmarkDetectionError(
                 "Pose quality is too low for reliable sizing. Stand straight facing the camera with full body visible."
+            )
+
+        if normalized_view == "side" and body_bbox_width_px < 16.0:
+            raise LandmarkDetectionError(
+                "Side profile could not be measured. Turn 90 degrees and keep full body in frame."
             )
 
         torso_points = {
@@ -216,6 +279,9 @@ class ImageProcessingService:
                 "symmetry_score": round(symmetry_score, 2),
                 "posture_score": round(posture_score, 2),
                 "measurement_consistency": round(measurement_consistency, 2),
+                "full_body_score": round(full_body_score, 2),
+                "tilt_degrees": round(tilt_degrees, 2),
+                "resolution_score": round(resolution_score, 2),
             },
             measurement_debug={
                 "shoulder_raw_px": round(shoulder_raw_px, 2),
@@ -227,7 +293,10 @@ class ImageProcessingService:
                 "depth_factor": round(perspective_depth_factor, 4),
                 "bbox_aspect_ratio": round(bbox_aspect_ratio, 4),
                 "shoulder_to_torso_ratio": round(ratio_shoulder_to_torso, 4),
+                "hip_to_shoulder_ratio": round(hip_width_px / max(shoulder_raw_px, 1.0), 4),
+                "perspective_factor": round(perspective_depth_factor, 4),
             },
+            view=normalized_view,
         )
 
     @staticmethod
@@ -238,6 +307,22 @@ class ImageProcessingService:
         image_height: int,
     ) -> np.ndarray:
         landmark = landmarks[landmark_index]
+        x = float(np.clip(landmark.x, 0.0, 1.0)) * image_width
+        y = float(np.clip(landmark.y, 0.0, 1.0)) * image_height
+        return np.array([x, y], dtype=np.float32)
+
+    @staticmethod
+    def _optional_point(
+        landmarks: list,
+        landmark_index: int,
+        image_width: int,
+        image_height: int,
+        min_visibility: float = 0.2,
+    ) -> Optional[np.ndarray]:
+        landmark = landmarks[landmark_index]
+        visibility = getattr(landmark, "visibility", 1.0)
+        if visibility < min_visibility:
+            return None
         x = float(np.clip(landmark.x, 0.0, 1.0)) * image_width
         y = float(np.clip(landmark.y, 0.0, 1.0)) * image_height
         return np.array([x, y], dtype=np.float32)

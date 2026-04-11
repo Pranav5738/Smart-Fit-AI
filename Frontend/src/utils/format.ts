@@ -70,7 +70,15 @@ export const normalizeImageSource = (raw?: string): string | undefined => {
     return undefined;
   }
 
-  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('blob:') || raw.startsWith('data:')) {
+  if (
+    raw.startsWith('http://') ||
+    raw.startsWith('https://') ||
+    raw.startsWith('blob:') ||
+    raw.startsWith('data:') ||
+    raw.startsWith('/') ||
+    raw.startsWith('./') ||
+    raw.startsWith('../')
+  ) {
     return raw;
   }
 

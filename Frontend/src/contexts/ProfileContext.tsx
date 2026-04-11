@@ -11,6 +11,7 @@ import {
   createProfile as createProfileApi,
   deleteProfile as deleteProfileApi,
   listProfiles,
+  updateProfile as updateProfileApi,
 } from '@/services/api';
 import type { SavedScan, UserProfile } from '@/types/smartfit';
 
@@ -20,6 +21,7 @@ interface ProfileContextValue {
   activeProfile: UserProfile;
   setActiveProfileId: (profileId: string) => void;
   createProfile: (name: string) => Promise<string>;
+  updateProfile: (profileId: string, name: string) => Promise<void>;
   deleteProfile: (profileId: string) => Promise<void>;
   saveScan: (profileId: string, scan: Omit<SavedScan, 'id'>) => void;
   exportData: () => string;
@@ -74,6 +76,10 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    if (import.meta.env.MODE === 'test') {
+      return;
+    }
+
     let isMounted = true;
 
     const syncProfilesFromBackend = async () => {
@@ -155,6 +161,39 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
         setActiveProfileIdState(profileId);
         localStorage.setItem(STORAGE_KEYS.activeProfileId, profileId);
         return profileId;
+      }
+    },
+    [profiles, persistProfiles]
+  );
+
+  const updateProfile = useCallback(
+    async (profileId: string, name: string) => {
+      const cleanedName = name.trim();
+      if (!cleanedName) {
+        throw new Error('Profile name cannot be empty.');
+      }
+
+      try {
+        const updated = await updateProfileApi(profileId, cleanedName);
+        const nextProfiles = profiles.map((profile) =>
+          profile.id === profileId
+            ? {
+                ...profile,
+                name: updated.name,
+              }
+            : profile
+        );
+        persistProfiles(nextProfiles);
+      } catch {
+        const nextProfiles = profiles.map((profile) =>
+          profile.id === profileId
+            ? {
+                ...profile,
+                name: cleanedName,
+              }
+            : profile
+        );
+        persistProfiles(nextProfiles);
       }
     },
     [profiles, persistProfiles]
@@ -261,6 +300,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       activeProfile,
       setActiveProfileId,
       createProfile,
+      updateProfile,
       deleteProfile,
       saveScan,
       exportData,
@@ -272,6 +312,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       activeProfile,
       setActiveProfileId,
       createProfile,
+      updateProfile,
       deleteProfile,
       saveScan,
       exportData,

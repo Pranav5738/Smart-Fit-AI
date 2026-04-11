@@ -24,9 +24,11 @@ export const VirtualTryOn = ({
 }: VirtualTryOnProps) => {
   const options = useMemo<OutfitOption[]>(() => {
     const mapped: OutfitOption[] = [];
+    const seenImages = new Set<string>();
 
     const normalizedTryOn = normalizeImageSource(tryonImage);
     if (normalizedTryOn) {
+      seenImages.add(normalizedTryOn);
       mapped.push({
         id: 'ai-preview',
         label: 'AI Try-On',
@@ -37,7 +39,8 @@ export const VirtualTryOn = ({
     recommendations.forEach((recommendation, index) => {
       const optionImage = normalizeImageSource(recommendation.image_url);
 
-      if (optionImage) {
+      if (optionImage && !seenImages.has(optionImage)) {
+        seenImages.add(optionImage);
         mapped.push({
           id: `recommendation-${index}`,
           label: recommendation.name,

@@ -27,7 +27,10 @@ def _parse_csv_field(raw_value: Optional[str]) -> list[str]:
     summary="Analyze image and predict clothing size",
 )
 async def analyze_image(
-    image: UploadFile = File(..., description="Input body image"),
+    front_image: UploadFile = File(..., description="Front-view full-body image"),
+    side_image: UploadFile = File(..., description="Side-view full-body image"),
+    extra_front_images: list[UploadFile] = File(default=[], description="Optional additional front frames for averaging"),
+    extra_side_images: list[UploadFile] = File(default=[], description="Optional additional side frames for averaging"),
     user_height_cm: Optional[float] = Form(
         default=None,
         gt=80,
@@ -58,6 +61,10 @@ async def analyze_image(
         default=None,
         description="Comma-separated catalog categories: tees,jeans,jackets",
     ),
+    preferred_brands: Optional[str] = Form(
+        default=None,
+        description="Comma-separated brand preferences: Nike,Adidas,Zara",
+    ),
     occasions: Optional[str] = Form(
         default=None,
         description="Comma-separated occasion filters: formal,casual,gym,travel",
@@ -87,17 +94,31 @@ async def analyze_image(
         description="Explicit consent acknowledgement before processing image",
     ),
 ) -> AnalyzeImageResponse:
-    if image.content_type is None or not image.content_type.startswith("image/"):
+    if front_image.content_type is None or not front_image.content_type.startswith("image/"):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported file type. Please upload a valid image.",
+            detail="Unsupported front image type. Please upload a valid image.",
         )
 
-    image_bytes = await image.read()
-    if not image_bytes:
+    if side_image.content_type is None or not side_image.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported side image type. Please upload a valid image.",
+        )
+
+    front_image_bytes = await front_image.read()
+    side_image_bytes = await side_image.read()
+
+    if not front_image_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded image is empty.",
+            detail="Uploaded front image is empty.",
+        )
+
+    if not side_image_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded side image is empty.",
         )
 
     if not consent_accepted:
@@ -106,9 +127,32 @@ async def analyze_image(
             detail="Consent is required before image analysis.",
         )
 
+    extra_front_bytes: list[bytes] = []
+    for upload in extra_front_images:
+        if upload.content_type is None or not upload.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Unsupported extra front image type.",
+            )
+        payload = await upload.read()
+        if payload:
+            extra_front_bytes.append(payload)
+
+    extra_side_bytes: list[bytes] = []
+    for upload in extra_side_images:
+        if upload.content_type is None or not upload.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Unsupported extra side image type.",
+            )
+        payload = await upload.read()
+        if payload:
+            extra_side_bytes.append(payload)
+
     try:
         result = get_pipeline().analyze_image(
-            image_bytes=image_bytes,
+            front_image_bytes=front_image_bytes,
+            side_image_bytes=side_image_bytes,
             user_height_cm=user_height_cm,
             age_group=age_group,
             gender=gender,
@@ -116,10 +160,13 @@ async def analyze_image(
             unit_system=unit_system,
             language=language,
             categories=_parse_csv_field(product_categories),
+            preferred_brands=_parse_csv_field(preferred_brands),
             occasions=_parse_csv_field(occasions),
             weather=_parse_csv_field(weather),
             colors=_parse_csv_field(color_preferences),
             include_tryon_comparison=include_tryon_comparison,
+            extra_front_image_bytes=extra_front_bytes,
+            extra_side_image_bytes=extra_side_bytes,
         )
 
         if profile_id:

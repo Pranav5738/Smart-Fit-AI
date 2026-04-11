@@ -39,6 +39,7 @@ interface AnalyzeImageOptions {
   userHeightCm?: number;
   ageGroup?: AgeGroup;
   gender?: GenderCode;
+  preferredBrands?: string[];
   profileId?: string;
   saveToHistory?: boolean;
   consentAccepted?: boolean;
@@ -241,11 +242,13 @@ const mapQualityResponse = (payload: BackendQualityCheckResponse): CaptureQualit
 };
 
 export const analyzeImage = async (
-  imageFile: File,
+  frontImageFile: File,
+  sideImageFile: File,
   options?: AnalyzeImageOptions
 ): Promise<AnalyzeResponse> => {
   const formData = new FormData();
-  formData.append('image', imageFile);
+  formData.append('front_image', frontImageFile);
+  formData.append('side_image', sideImageFile);
 
   formData.append('fit_preference', options?.fitPreference || 'regular');
   formData.append('age_group', options?.ageGroup || 'adult');
@@ -265,6 +268,11 @@ export const analyzeImage = async (
   const categories = toCsv(options?.productCategories);
   if (categories) {
     formData.append('product_categories', categories);
+  }
+
+  const preferredBrands = toCsv(options?.preferredBrands);
+  if (preferredBrands) {
+    formData.append('preferred_brands', preferredBrands);
   }
 
   const occasions = toCsv(options?.occasions);
@@ -333,6 +341,15 @@ export const listProfiles = async (): Promise<UserProfile[]> => {
 export const createProfile = async (name: string): Promise<UserProfile> => {
   try {
     const { data } = await api.post<BackendProfileSummary>('/profiles/', { name });
+    return mapBackendProfileToUserProfile(data);
+  } catch (error) {
+    throw new Error(normalizeApiError(error));
+  }
+};
+
+export const updateProfile = async (profileId: string, name: string): Promise<UserProfile> => {
+  try {
+    const { data } = await api.put<BackendProfileSummary>(`/profiles/${profileId}`, { name });
     return mapBackendProfileToUserProfile(data);
   } catch (error) {
     throw new Error(normalizeApiError(error));

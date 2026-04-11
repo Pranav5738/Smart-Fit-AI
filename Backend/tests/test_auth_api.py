@@ -33,6 +33,44 @@ def test_register_rejects_duplicate_email(client: TestClient) -> None:
     assert duplicate_response.json()["error_code"] == "AUTH_EMAIL_EXISTS"
 
 
+def test_signin_with_registered_credentials_succeeds(client: TestClient) -> None:
+    client.post("/auth/register", json=_register_payload())
+
+    signin_response = client.post(
+        "/auth/signin",
+        json={"email": "user@example.com", "password": "StrongPass1!"},
+    )
+
+    assert signin_response.status_code == 200
+    payload = signin_response.json()
+    assert payload["user"]["email"] == "user@example.com"
+    assert payload["tokens"]["access_token"]
+
+
+def test_signin_accepts_whitespace_padded_input_for_legacy_passwords(client: TestClient) -> None:
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "name": "Whitespace User",
+            "email": "spacey@example.com",
+            "password": "StrongPass1!",
+        },
+    )
+    assert register_response.status_code == 201
+
+    signin_exact = client.post(
+        "/auth/signin",
+        json={"email": "spacey@example.com", "password": "StrongPass1!"},
+    )
+    assert signin_exact.status_code == 200
+
+    signin_with_padding = client.post(
+        "/auth/signin",
+        json={"email": "spacey@example.com", "password": "  StrongPass1!  "},
+    )
+    assert signin_with_padding.status_code == 200
+
+
 def test_signin_locks_after_repeated_failures(client: TestClient) -> None:
     client.post("/auth/register", json=_register_payload())
 

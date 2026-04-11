@@ -7,6 +7,7 @@ from models.schemas import (
     ProfileCreateRequest,
     ProfileExportResponse,
     ProfileSummary,
+    ProfileUpdateRequest,
     ScanHistoryItem,
 )
 from services.fit_card import FitCardService
@@ -34,6 +35,12 @@ def list_profiles() -> list[ProfileSummary]:
 @router.get("/{profile_id}", response_model=ProfileSummary)
 def get_profile(profile_id: str) -> ProfileSummary:
     return ProfileSummary(**profile_store.get_profile(profile_id))
+
+
+@router.put("/{profile_id}", response_model=ProfileSummary)
+def update_profile(profile_id: str, payload: ProfileUpdateRequest) -> ProfileSummary:
+    updated = profile_store.update_profile(profile_id=profile_id, name=payload.name)
+    return ProfileSummary(**updated)
 
 
 @router.get("/{profile_id}/history", response_model=list[ScanHistoryItem])

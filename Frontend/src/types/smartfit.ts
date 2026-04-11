@@ -85,6 +85,28 @@ export interface AnalyzeResponse {
   size_range?: string;
   prediction_advice?: string;
   brand_mapping: Record<string, string>;
+  nike_size_suggestions?: {
+    brand: string;
+    tops_size: string;
+    bottoms_size: string;
+    measurement_basis: {
+      chest_cm: number;
+      waist_cm: number;
+      chest_in: number;
+      waist_in: number;
+    };
+  };
+  zara_size_suggestions?: {
+    brand: string;
+    tops_size: string;
+    bottoms_size: string;
+    measurement_basis: {
+      chest_cm: number;
+      waist_cm: number;
+      chest_in: number;
+      waist_in: number;
+    };
+  };
   recommendations: Array<string | RecommendationItem>;
   capture_quality?: {
     overall_score: number;

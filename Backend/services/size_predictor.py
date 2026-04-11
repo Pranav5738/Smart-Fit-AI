@@ -11,11 +11,6 @@ try:
 except ImportError:  # pragma: no cover
     joblib = None
 
-try:
-    from sklearn.ensemble import RandomForestClassifier
-except ImportError:  # pragma: no cover
-    RandomForestClassifier = None
-
 logger = get_logger(__name__)
 
 SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL"]
@@ -125,15 +120,8 @@ class SizePredictorService:
                 logger.exception("Failed to load model: %s", exc)
                 self.model = None
 
-        self.model = self._bootstrap_model()
-
-        if self.model is not None and joblib is not None:
-            try:
-                self.model_path.parent.mkdir(parents=True, exist_ok=True)
-                joblib.dump(self.model, self.model_path)
-                logger.info("Bootstrapped and saved fallback model to %s", self.model_path)
-            except Exception as exc:  # pragma: no cover
-                logger.warning("Failed to persist fallback model: %s", exc)
+        # No synthetic training fallback: rely on profile size charts by default.
+        self.model = None
 
     def predict(
         self,
@@ -144,7 +132,12 @@ class SizePredictorService:
         profile_key = self._profile_key(age_group=age_group, gender=gender)
         profile_bands = PROFILE_BANDS.get(profile_key)
         if profile_bands is not None:
-            return self._profile_band_predict(measurements=measurements, size_bands=profile_bands)
+            chart_size, chart_confidence = self._profile_band_predict(
+                measurements=measurements,
+                size_bands=profile_bands,
+            )
+        else:
+            chart_size, chart_confidence = self._heuristic_predict(measurements)
 
         features = np.array(
             [[measurements["chest"], measurements["waist"], measurements["shoulder"]]],
@@ -152,16 +145,19 @@ class SizePredictorService:
         )
 
         if self.model is None:
-            return self._heuristic_predict(measurements)
+            return chart_size, chart_confidence
 
         try:
             raw_prediction = self.model.predict(features)[0]
             predicted_size = self._normalize_prediction(raw_prediction)
-            confidence = self._predict_confidence(features)
+            model_confidence = self._predict_confidence(features)
+
+            # Blend model confidence with chart confidence to stay anchored to real fit charts.
+            confidence = float(np.clip((model_confidence * 0.55) + (chart_confidence * 0.45), 0.45, 0.98))
             return predicted_size, confidence
         except Exception as exc:  # pragma: no cover
-            logger.exception("Model prediction failed. Using fallback heuristic: %s", exc)
-            return self._heuristic_predict(measurements)
+            logger.exception("Model prediction failed. Using chart mapping fallback: %s", exc)
+            return chart_size, chart_confidence
 
     def apply_fit_preference(
         self,
@@ -225,66 +221,6 @@ class SizePredictorService:
 
         confidence = float(np.clip(0.97 - (best_distance * 0.14), 0.55, 0.97))
         return best_size, confidence
-
-    def _bootstrap_model(self):
-        if RandomForestClassifier is None:
-            logger.warning(
-                "scikit-learn is not installed. Falling back to heuristic size prediction."
-            )
-            return None
-
-        # Synthetic training data provides a robust default when no artifact is available.
-        rng = np.random.default_rng(42)
-        size_bands = {
-            "XS": {"chest": (89.0, 94.5), "waist": (76.0, 81.0), "shoulder": (40.0, 43.0)},
-            "S": {"chest": (94.5, 99.5), "waist": (81.0, 86.0), "shoulder": (42.0, 44.0)},
-            "M": {"chest": (99.5, 104.5), "waist": (86.0, 91.0), "shoulder": (44.0, 46.0)},
-            "L": {"chest": (104.5, 109.5), "waist": (91.0, 96.0), "shoulder": (46.0, 48.0)},
-            "XL": {"chest": (109.5, 114.5), "waist": (96.0, 101.0), "shoulder": (48.0, 50.0)},
-            "XXL": {"chest": (114.5, 119.5), "waist": (101.0, 106.0), "shoulder": (50.0, 52.0)},
-        }
-
-        features = []
-        labels = []
-
-        for size, limits in size_bands.items():
-            chest_low, chest_high = limits["chest"]
-            waist_low, waist_high = limits["waist"]
-            shoulder_low, shoulder_high = limits["shoulder"]
-
-            chest_values = rng.normal(
-                loc=(chest_low + chest_high) / 2.0,
-                scale=(chest_high - chest_low) / 5.5,
-                size=260,
-            )
-            waist_values = rng.normal(
-                loc=(waist_low + waist_high) / 2.0,
-                scale=(waist_high - waist_low) / 5.5,
-                size=260,
-            )
-            shoulder_values = rng.normal(
-                loc=(shoulder_low + shoulder_high) / 2.0,
-                scale=(shoulder_high - shoulder_low) / 5.5,
-                size=260,
-            )
-
-            for chest, waist, shoulder in zip(chest_values, waist_values, shoulder_values):
-                features.append([float(chest), float(waist), float(shoulder)])
-                labels.append(size)
-
-        X = np.asarray(features, dtype=np.float32)
-        y = np.asarray(labels)
-
-        model = RandomForestClassifier(
-            n_estimators=300,
-            max_depth=10,
-            min_samples_leaf=2,
-            random_state=42,
-            class_weight="balanced_subsample",
-        )
-        model.fit(X, y)
-        logger.info("Bootstrapped fallback RandomForest model for size prediction.")
-        return model
 
     def _predict_confidence(self, features: np.ndarray) -> float:
         if hasattr(self.model, "predict_proba"):

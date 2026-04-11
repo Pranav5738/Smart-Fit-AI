@@ -91,6 +91,13 @@ class PrivacySummary(BaseModel):
     data_retention: str
 
 
+class NikeSizeSuggestions(BaseModel):
+    brand: str
+    tops_size: str
+    bottoms_size: str
+    measurement_basis: Dict[str, float]
+
+
 class AnalyzeImageResponse(BaseModel):
     measurement_unit: UnitSystem
     age_group: AgeGroup = "adult"
@@ -105,6 +112,8 @@ class AnalyzeImageResponse(BaseModel):
     size_range: str | None = None
     prediction_advice: str | None = None
     brand_mapping: Dict[str, str]
+    nike_size_suggestions: Optional[NikeSizeSuggestions] = None
+    zara_size_suggestions: Optional[NikeSizeSuggestions] = None
     recommendations: List[RecommendationItem]
     capture_quality: CaptureQualityReport
     explainability: ExplainabilityPanel
@@ -228,6 +237,10 @@ class OptimizeImageResponse(BaseModel):
 
 
 class ProfileCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+
+
+class ProfileUpdateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=80)
 
 

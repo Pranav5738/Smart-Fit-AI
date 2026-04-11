@@ -89,6 +89,27 @@ class ProfileStoreService:
 
         return dict(row)
 
+    def update_profile(self, profile_id: str, name: str) -> dict:
+        cleaned_name = name.strip()
+        if not cleaned_name:
+            raise SmartFitError(
+                message="Profile name cannot be empty.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                error_code="INVALID_PROFILE_NAME",
+            )
+
+        self.get_profile(profile_id)
+
+        with self._lock:
+            with self._connect() as connection:
+                connection.execute(
+                    "UPDATE profiles SET name = ? WHERE id = ?",
+                    (cleaned_name, profile_id),
+                )
+                connection.commit()
+
+        return self.get_profile(profile_id)
+
     def save_scan(self, profile_id: str, analysis_payload: dict) -> str:
         self.get_profile(profile_id)
 

@@ -64,7 +64,7 @@ class AuthStoreService:
     ) -> dict:
         cleaned_name = name.strip()
         normalized_email = email.strip().lower()
-        cleaned_password = password.strip()
+        provided_password = password
 
         if not cleaned_name:
             raise SmartFitError(
@@ -80,7 +80,7 @@ class AuthStoreService:
                 error_code="INVALID_EMAIL",
             )
 
-        self._validate_password_strength(cleaned_password)
+        self._validate_password_strength(provided_password)
 
         if height_cm is not None and height_cm <= 0:
             raise SmartFitError(
@@ -98,7 +98,7 @@ class AuthStoreService:
 
         user_id = f"user_{uuid4().hex[:12]}"
         created_at = self._utc_now()
-        password_hash = self._hash_password(cleaned_password)
+        password_hash = self._hash_password(provided_password)
 
         with self._lock:
             with self._connect() as connection:
@@ -144,9 +144,9 @@ class AuthStoreService:
 
     def authenticate(self, email: str, password: str) -> dict:
         normalized_email = email.strip().lower()
-        cleaned_password = password.strip()
+        provided_password = password
 
-        if not normalized_email or not cleaned_password:
+        if not normalized_email or not provided_password:
             raise SmartFitError(
                 message="Email and password are required.",
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -164,10 +164,22 @@ class AuthStoreService:
                     (normalized_email,),
                 ).fetchone()
 
-                if row is None or not self._verify_password(
-                    plaintext_password=cleaned_password,
-                    stored_hash=row["password_hash"],
-                ):
+                password_matches = False
+                if row is not None:
+                    password_matches = self._verify_password(
+                        plaintext_password=provided_password,
+                        stored_hash=row["password_hash"],
+                    )
+                    if not password_matches:
+                        # Backward compatibility for accounts created when UI/password handling trimmed input.
+                        trimmed_password = provided_password.strip()
+                        if trimmed_password != provided_password:
+                            password_matches = self._verify_password(
+                                plaintext_password=trimmed_password,
+                                stored_hash=row["password_hash"],
+                            )
+
+                if row is None or not password_matches:
                     locked_until = self._record_failed_attempt(
                         connection=connection,
                         email=normalized_email,

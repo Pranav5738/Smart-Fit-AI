@@ -8,6 +8,7 @@ from utils.config import get_settings
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+ALLOWED_BRANDS = {"nike", "zara"}
 
 
 class CatalogService:
@@ -29,10 +30,14 @@ class CatalogService:
         with self.catalog_path.open("r", encoding="utf-8") as csv_file:
             reader = csv.DictReader(csv_file)
             for row in reader:
+                brand = row.get("brand", "").strip()
+                if brand.lower() not in ALLOWED_BRANDS:
+                    continue
+
                 products.append(
                     {
                         "sku": row.get("sku", ""),
-                        "brand": row.get("brand", ""),
+                        "brand": brand,
                         "product_name": row.get("product_name", ""),
                         "category": row.get("category", ""),
                         "occasions": self._split_pipe_values(row.get("occasions", "")),
@@ -54,6 +59,7 @@ class CatalogService:
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         filtered: list[dict[str, Any]] = []
+        max_limit = max(limit, 1)
 
         categories_set = self._to_set(categories)
         occasions_set = self._to_set(occasions)
@@ -78,10 +84,8 @@ class CatalogService:
                 continue
 
             filtered.append(product)
-            if len(filtered) >= max(limit, 1):
-                break
 
-        return filtered
+        return filtered[:max_limit]
 
     def list_brands(self) -> list[str]:
         brands = sorted({product["brand"] for product in self._products if product["brand"]})

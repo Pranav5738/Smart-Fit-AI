@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import App from '@/App';
 
@@ -64,10 +64,14 @@ const renderAt = (path: string) => {
 };
 
 describe('Route Access Matrix', () => {
-  it('shows auth landing for unauthenticated home route', async () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('redirects unauthenticated home route to sign-in', async () => {
     renderAt('/');
 
-    expect(await screen.findByText('AUTH_LANDING_PAGE')).toBeTruthy();
+    expect(await screen.findByText('SIGNIN_PAGE')).toBeTruthy();
   });
 
   it('redirects unauthenticated dashboard route to sign-in', async () => {

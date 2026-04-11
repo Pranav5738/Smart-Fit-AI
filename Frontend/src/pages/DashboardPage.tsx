@@ -47,13 +47,17 @@ export const DashboardPage = () => {
   const { activeProfile } = useProfiles();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const sideFileInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
   const previousPreviewRef = useRef('');
+  const previousSidePreviewRef = useRef('');
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [sideFile, setSideFile] = useState<File | null>(null);
+  const [sidePreviewUrl, setSidePreviewUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isWebcamOpen, setIsWebcamOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -88,6 +92,17 @@ export const DashboardPage = () => {
     setPreviewUrl(next);
   }, []);
 
+  const releaseSidePreview = useCallback((next = '') => {
+    const previous = previousSidePreviewRef.current;
+
+    if (previous.startsWith('blob:')) {
+      URL.revokeObjectURL(previous);
+    }
+
+    previousSidePreviewRef.current = next;
+    setSidePreviewUrl(next);
+  }, []);
+
   const stopWebcam = useCallback(() => {
     clearCaptureCountdown();
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -111,8 +126,9 @@ export const DashboardPage = () => {
     return () => {
       stopWebcam();
       releasePreview();
+      releaseSidePreview();
     };
-  }, [releasePreview, stopWebcam]);
+  }, [releasePreview, releaseSidePreview, stopWebcam]);
 
   const setImageFile = useCallback(
     async (file: File) => {
@@ -125,14 +141,42 @@ export const DashboardPage = () => {
       const optimized = await compressImageForMobile(file);
       releasePreview(URL.createObjectURL(optimized));
       setSelectedFile(optimized);
-      setCaptureHints([]);
       setErrorMessage(null);
+
+      const quickFrontQuality = await evaluateCaptureQuality(optimized, language);
+      setCaptureHints(quickFrontQuality.hints.slice(0, 2).map((hint) => `Front: ${hint}`));
 
       if (optimized.size < file.size) {
         notify('Image optimized for faster analysis.', 'info');
       }
     },
-    [clearCaptureCountdown, notify, releasePreview]
+    [clearCaptureCountdown, language, notify, releasePreview]
+  );
+
+  const setSideImageFile = useCallback(
+    async (file: File) => {
+      if (!isImageFile(file)) {
+        notify('Please select a valid side-view image file.', 'error');
+        return;
+      }
+
+      const optimized = await compressImageForMobile(file);
+      releaseSidePreview(URL.createObjectURL(optimized));
+      setSideFile(optimized);
+      setErrorMessage(null);
+
+      const quickSideQuality = await evaluateCaptureQuality(optimized, language);
+      setCaptureHints((current) => {
+        const frontHints = current.filter((item) => item.startsWith('Front:')).slice(0, 2);
+        const sideHints = quickSideQuality.hints.slice(0, 2).map((hint) => `Side: ${hint}`);
+        return [...frontHints, ...sideHints];
+      });
+
+      if (optimized.size < file.size) {
+        notify('Side image optimized for faster analysis.', 'info');
+      }
+    },
+    [language, notify, releaseSidePreview]
   );
 
   const toggleBrand = (brand: string) => {
@@ -252,7 +296,12 @@ export const DashboardPage = () => {
     event.preventDefault();
 
     if (!selectedFile) {
-      notify('Upload an image or capture via webcam first.', 'error');
+      notify('Upload a front image or capture via webcam first.', 'error');
+      return;
+    }
+
+    if (!sideFile) {
+      notify('Upload a side-view image before analysis.', 'error');
       return;
     }
 
@@ -270,11 +319,12 @@ export const DashboardPage = () => {
 
       const resolvedHeightCm = ageGroup === 'adult' ? user?.heightCm : undefined;
 
-      const response = await analyzeImage(selectedFile, {
+      const response = await analyzeImage(selectedFile, sideFile, {
         fitPreference,
         userHeightCm: resolvedHeightCm,
         ageGroup,
         gender,
+        preferredBrands: selectedBrands,
         profileId: activeProfile.id,
         saveToHistory: true,
         consentAccepted: true,
@@ -399,6 +449,35 @@ export const DashboardPage = () => {
                   />
                 </div>
 
+                <div className="rounded-2xl border border-slate-300 bg-slate-50 p-4 text-center dark:border-slate-700 dark:bg-slate-950/40">
+                  <p className="text-sm font-bold">Upload Side Image (Required)</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Stand in side profile for torso depth capture.</p>
+                  <button
+                    type="button"
+                    onClick={() => sideFileInputRef.current?.click()}
+                    className="focus-ring mt-3 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
+                  >
+                    Browse Side Image
+                  </button>
+                  <input
+                    ref={sideFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onInput={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      if (file) {
+                        void setSideImageFile(file);
+                      }
+                    }}
+                  />
+                  {sideFile ? (
+                    <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Side image ready: {sideFile.name}</p>
+                  ) : (
+                    <p className="mt-2 text-xs text-rose-600 dark:text-rose-300">Side image missing.</p>
+                  )}
+                </div>
+
                 <div className="grid gap-2 sm:gap-3 sm:grid-cols-3 xl:grid-cols-1">
                   <button
                     type="button"
@@ -416,7 +495,7 @@ export const DashboardPage = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={!selectedFile || isAnalyzing}
+                    disabled={!selectedFile || !sideFile || isAnalyzing}
                     className="focus-ring rounded-xl bg-accent-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Analyze Fit'}
@@ -513,23 +592,39 @@ export const DashboardPage = () => {
                   ) : null}
                 </div>
 
-                <div className="grid h-[18rem] place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 p-2 sm:h-[28rem] sm:p-3 lg:h-[34rem] dark:border-slate-700 dark:bg-slate-950/40">
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt="Selected preview"
-                      className="max-h-full max-w-full rounded-xl object-contain"
-                    />
-                  ) : (
-                    <div className="text-center text-sm text-slate-500 dark:text-slate-400">
-                      Upload or capture an image to preview it here.
-                    </div>
-                  )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid h-[18rem] place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 p-2 sm:h-[22rem] sm:p-3 lg:h-[28rem] dark:border-slate-700 dark:bg-slate-950/40">
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt="Front preview"
+                        className="max-h-full max-w-full rounded-xl object-contain"
+                      />
+                    ) : (
+                      <div className="text-center text-sm text-slate-500 dark:text-slate-400">
+                        Upload front image.
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid h-[18rem] place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 p-2 sm:h-[22rem] sm:p-3 lg:h-[28rem] dark:border-slate-700 dark:bg-slate-950/40">
+                    {sidePreviewUrl ? (
+                      <img
+                        src={sidePreviewUrl}
+                        alt="Side preview"
+                        className="max-h-full max-w-full rounded-xl object-contain"
+                      />
+                    ) : (
+                      <div className="text-center text-sm text-slate-500 dark:text-slate-400">
+                        Upload side image.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {selectedFile ? (
+                {selectedFile || sideFile ? (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
-                    Selected file: <span className="font-semibold">{selectedFile.name}</span>
+                    Front: <span className="font-semibold">{selectedFile?.name || 'Not selected'}</span> | Side:{' '}
+                    <span className="font-semibold">{sideFile?.name || 'Not selected'}</span>
                   </div>
                 ) : null}
 
@@ -668,6 +763,9 @@ export const DashboardPage = () => {
                   {result.prediction_advice ? (
                     <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{result.prediction_advice}</p>
                   ) : null}
+                  {result.explainability?.size_reasoning ? (
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{result.explainability.size_reasoning}</p>
+                  ) : null}
                 </article>
 
                 <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
@@ -683,6 +781,48 @@ export const DashboardPage = () => {
                 </article>
               </div>
 
+              {result.nike_size_suggestions ? (
+                <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">Nike Size Pair</p>
+                    <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">
+                      Chart-Based
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg bg-white px-3 py-2 dark:bg-slate-900">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Tops</p>
+                      <p className="text-lg font-bold">{result.nike_size_suggestions.tops_size}</p>
+                    </div>
+                    <div className="rounded-lg bg-white px-3 py-2 dark:bg-slate-900">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Bottoms</p>
+                      <p className="text-lg font-bold">{result.nike_size_suggestions.bottoms_size}</p>
+                    </div>
+                  </div>
+                </article>
+              ) : null}
+
+              {result.zara_size_suggestions ? (
+                <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">Zara Size Pair</p>
+                    <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">
+                      Chart-Based
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg bg-white px-3 py-2 dark:bg-slate-900">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Tops</p>
+                      <p className="text-lg font-bold">{result.zara_size_suggestions.tops_size}</p>
+                    </div>
+                    <div className="rounded-lg bg-white px-3 py-2 dark:bg-slate-900">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Bottoms</p>
+                      <p className="text-lg font-bold">{result.zara_size_suggestions.bottoms_size}</p>
+                    </div>
+                  </div>
+                </article>
+              ) : null}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
                   <p className="text-sm font-semibold">Fit Confidence</p>
@@ -690,6 +830,11 @@ export const DashboardPage = () => {
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     Higher confidence means stronger measurement consistency.
                   </p>
+                  {confidence < 75 ? (
+                    <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                      Retry suggested: retake both front and side images with full body visible and a straight pose.
+                    </p>
+                  ) : null}
                 </article>
 
                 <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">

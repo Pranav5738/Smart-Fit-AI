@@ -20,6 +20,15 @@ def test_profile_crud_endpoints(client: TestClient) -> None:
     assert get_response.status_code == 200
     assert get_response.json()["id"] == profile_id
 
+    update_response = client.put(f"/profiles/{profile_id}", json={"name": "Updated Profile"})
+    assert update_response.status_code == 200
+    assert update_response.json()["id"] == profile_id
+    assert update_response.json()["name"] == "Updated Profile"
+
+    invalid_update_response = client.put(f"/profiles/{profile_id}", json={"name": "   "})
+    assert invalid_update_response.status_code == 422
+    assert invalid_update_response.json()["error_code"] == "INVALID_PROFILE_NAME"
+
     history_response = client.get(f"/profiles/{profile_id}/history")
     assert history_response.status_code == 200
     assert history_response.json() == []
