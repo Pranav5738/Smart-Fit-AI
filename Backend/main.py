@@ -21,9 +21,35 @@ from utils.config import get_settings
 from utils.exceptions import SmartFitError
 from utils.logger import configure_logging, get_logger
 
+
+def _normalize_origin(origin: str) -> str:
+	return origin.strip().rstrip("/")
+
 settings = get_settings()
 configure_logging(debug=settings.debug)
 logger = get_logger(__name__)
+
+default_fallback_origins = {
+	"https://smart-fit-ai-two.vercel.app",
+	"http://localhost:5173",
+	"http://127.0.0.1:5173",
+}
+
+configured_origins = {
+	_normalize_origin(origin)
+	for origin in settings.allowed_origins
+	if origin and origin.strip()
+}
+
+effective_allowed_origins = sorted(configured_origins | default_fallback_origins)
+effective_cors_regex = settings.cors_allow_origin_regex or (
+	r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|"
+	r"^https://.*\.vercel\.app$|"
+	r"^https://.*\.onrender\.com$"
+)
+
+logger.info("CORS allow_origins: %s", effective_allowed_origins)
+logger.info("CORS allow_origin_regex: %s", effective_cors_regex)
 
 app = FastAPI(
 	title=settings.app_name,
@@ -33,9 +59,9 @@ app = FastAPI(
 
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=settings.allowed_origins,
-	allow_origin_regex=settings.cors_allow_origin_regex,
-	allow_credentials="*" not in settings.allowed_origins,
+	allow_origins=effective_allowed_origins,
+	allow_origin_regex=effective_cors_regex,
+	allow_credentials="*" not in effective_allowed_origins,
 	allow_methods=["*"],
 	allow_headers=["*"],
 )
