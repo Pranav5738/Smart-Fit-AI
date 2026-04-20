@@ -54,6 +54,17 @@ app.mount(
 )
 
 
+@app.get("/", tags=["Health"])
+def root() -> dict:
+	return {
+		"status": "ok",
+		"service": settings.app_name,
+		"version": settings.app_version,
+		"docs": "/docs",
+		"health": "/health",
+	}
+
+
 @app.get("/health", tags=["Health"])
 def health_check() -> dict:
 	return {

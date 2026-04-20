@@ -68,3 +68,5 @@ The frontend expects:
 4. Production build:
 
    npm run build
+
+5. If deploying on Vercel, keep `vercel.json` in the frontend root so refreshes on routes like `/signin` and `/dashboard` rewrite to `index.html`.
