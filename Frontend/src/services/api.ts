@@ -11,8 +11,24 @@ import {
   UserProfile,
 } from '@/types/smartfit';
 
+const resolveApiBaseUrl = (): string => {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+  }
+
+  return 'https://smart-fit-ai.onrender.com';
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localhost:8000',
+  baseURL: resolveApiBaseUrl(),
   timeout: 30000,
 });
 
