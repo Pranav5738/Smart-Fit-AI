@@ -74,7 +74,8 @@ Required environment variables for deployment:
 
 - `DATABASE_URL` (PostgreSQL connection string)
 - `AUTH_TOKEN_SECRET` (at least 32 characters)
-- `ALLOWED_ORIGINS` (JSON array of trusted frontend origins)
+- `ALLOWED_ORIGINS` (trusted frontend origins as JSON array or comma-separated list)
+- `CORS_ALLOW_ORIGIN_REGEX` (optional regex for dynamic origins such as localhost any port)
 
 `render.yaml` is configured to provision PostgreSQL, bind `DATABASE_URL`, generate `AUTH_TOKEN_SECRET`, and health-check `/health`.
 

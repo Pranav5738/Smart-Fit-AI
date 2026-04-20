@@ -1,8 +1,9 @@
+import json
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import Any, List, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -20,6 +21,11 @@ class Settings(BaseSettings):
             "http://localhost:5173",
             "http://127.0.0.1:5173",
         ]
+    )
+    cors_allow_origin_regex: Optional[str] = (
+        r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|"
+        r"^https://.*\.vercel\.app$|"
+        r"^https://.*\.onrender\.com$"
     )
 
     default_user_height_cm: float = 170.0
@@ -44,6 +50,27 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+
+        raw = value.strip()
+        if not raw:
+            return []
+
+        # Allow ALLOWED_ORIGINS to be provided as either JSON array or CSV.
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            except json.JSONDecodeError:
+                pass
+
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
 @lru_cache
