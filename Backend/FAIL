@@ -1,0 +1,3 @@
+URL: postgresql://postgres:2100@localhost:5432/SmartFit-AI?sslmode=disable - SmartFit-AI/postgres
+URL: postgresql://postgres:2100@localhost:5432/smartfit_ai?sslmode=disable - connection to server at "localhost" (::1), port 5432 failed: FATAL:  database "smartfit_ai" does not exist
+URL: postgresql://postgre:2100@localhost:5432/smartfit_ai?sslmode=disable - connection to server at "localhost" (::1), port 5432 failed: FATAL:  password authentication failed for user "postgre"

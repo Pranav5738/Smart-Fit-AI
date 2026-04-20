@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
@@ -12,7 +13,11 @@ from utils.logger import get_logger
 router = APIRouter(tags=["SmartFit"])
 logger = get_logger(__name__)
 settings = get_settings()
-profile_store = ProfileStoreService(db_path=settings.data_store_path)
+
+
+@lru_cache
+def _get_profile_store() -> ProfileStoreService:
+    return ProfileStoreService(database_url=settings.database_url)
 
 
 def _parse_csv_field(raw_value: Optional[str]) -> list[str]:
@@ -173,6 +178,7 @@ async def analyze_image(
             result["profile_id"] = profile_id
 
         if profile_id and save_to_history:
+            profile_store = _get_profile_store()
             scan_id = profile_store.save_scan(profile_id=profile_id, analysis_payload=result)
             result["scan_id"] = scan_id
 

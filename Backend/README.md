@@ -70,6 +70,14 @@ Use `Backend/requirements.txt` for dependencies and start the service with:
 gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
 ```
 
+Required environment variables for deployment:
+
+- `DATABASE_URL` (PostgreSQL connection string)
+- `AUTH_TOKEN_SECRET` (at least 32 characters)
+- `ALLOWED_ORIGINS` (JSON array of trusted frontend origins)
+
+`render.yaml` is configured to provision PostgreSQL, bind `DATABASE_URL`, generate `AUTH_TOKEN_SECRET`, and health-check `/health`.
+
 5. Run API:
 
 ```bash
@@ -151,7 +159,13 @@ pytest -q tests
 - API docs are available at /docs.
 - MediaPipe is pinned to 0.10.14 for Pose compatibility.
 - Uploaded image bytes are processed in-memory and discarded after inference.
-- Profile and scan history are persisted in SQLite at model_artifacts/profile_store.db.
+- Profile, scan history, and auth data are persisted in PostgreSQL via DATABASE_URL.
+
+## Database Configuration
+
+- PostgreSQL is required for backend runtime storage.
+- Set `DATABASE_URL` to a PostgreSQL connection string.
+- On Render, wire `DATABASE_URL` from the managed Postgres connection string.
 
 ## Startup Log Note
 

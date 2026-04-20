@@ -3,15 +3,22 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import importlib
 import json
 import re
 import secrets
-import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from typing import Any, Optional
 from uuid import uuid4
+
+try:
+    psycopg = importlib.import_module("psycopg")
+    dict_row = importlib.import_module("psycopg.rows").dict_row
+except ModuleNotFoundError:  # pragma: no cover - optional during local linting without dependencies
+    psycopg = None
+    dict_row = None
 
 from fastapi import status
 
@@ -27,11 +34,11 @@ _PASSWORD_HAS_SYMBOL = re.compile(r"[^A-Za-z0-9]")
 
 
 class AuthStoreService:
-    """SQLite-backed storage for SmartFit authentication users."""
+    """Storage for SmartFit authentication users."""
 
     def __init__(
         self,
-        db_path: Path,
+        database_url: Optional[str],
         access_token_secret: str,
         access_token_minutes: int = 20,
         refresh_token_days: int = 14,
@@ -39,7 +46,7 @@ class AuthStoreService:
         lockout_minutes: int = 10,
         attempt_window_minutes: int = 15,
     ) -> None:
-        self.db_path = db_path
+        self.database_url = (database_url or "").strip()
         self._lock = threading.Lock()
         self.access_token_secret = access_token_secret.strip()
         self.access_token_minutes = max(1, access_token_minutes)
@@ -51,7 +58,15 @@ class AuthStoreService:
         if not self.access_token_secret:
             raise ValueError("auth access token secret cannot be empty")
 
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.database_url:
+            raise ValueError("DATABASE_URL must be set for PostgreSQL storage")
+
+        if not self.database_url.lower().startswith(("postgres://", "postgresql://")):
+            raise ValueError("DATABASE_URL must be a PostgreSQL URL")
+
+        if psycopg is None:
+            raise ValueError("psycopg is required for PostgreSQL storage")
+
         self._init_schema()
 
     def register_user(
@@ -102,7 +117,8 @@ class AuthStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                existing = connection.execute(
+                existing = self._execute(
+                    connection,
                     "SELECT id FROM auth_users WHERE email = ?",
                     (normalized_email,),
                 ).fetchone()
@@ -114,7 +130,8 @@ class AuthStoreService:
                         error_code="AUTH_EMAIL_EXISTS",
                     )
 
-                connection.execute(
+                self._execute(
+                    connection,
                     """
                     INSERT INTO auth_users (
                         id,
@@ -159,7 +176,8 @@ class AuthStoreService:
             with self._connect() as connection:
                 self._ensure_not_locked(connection, normalized_email, now)
 
-                row = connection.execute(
+                row = self._execute(
+                    connection,
                     "SELECT * FROM auth_users WHERE email = ?",
                     (normalized_email,),
                 ).fetchone()
@@ -205,11 +223,13 @@ class AuthStoreService:
                     )
 
                 last_login_at = self._utc_now()
-                connection.execute(
+                self._execute(
+                    connection,
                     "UPDATE auth_users SET last_login_at = ? WHERE id = ?",
                     (last_login_at, row["id"]),
                 )
-                connection.execute(
+                self._execute(
+                    connection,
                     "DELETE FROM auth_login_attempts WHERE email = ?",
                     (normalized_email,),
                 )
@@ -228,7 +248,8 @@ class AuthStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                connection.execute(
+                self._execute(
+                    connection,
                     """
                     INSERT INTO auth_sessions (
                         id,
@@ -280,7 +301,8 @@ class AuthStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                session_row = connection.execute(
+                session_row = self._execute(
+                    connection,
                     """
                     SELECT id, user_id, expires_at, revoked_at
                     FROM auth_sessions
@@ -305,7 +327,8 @@ class AuthStoreService:
 
                 expires_at = self._parse_datetime(session_row["expires_at"])
                 if expires_at <= now:
-                    connection.execute(
+                    self._execute(
+                        connection,
                         "UPDATE auth_sessions SET revoked_at = ? WHERE id = ?",
                         (now.isoformat(), session_row["id"]),
                     )
@@ -317,7 +340,8 @@ class AuthStoreService:
                     )
 
                 refreshed_expires = now + timedelta(days=self.refresh_token_days)
-                connection.execute(
+                self._execute(
+                    connection,
                     """
                     UPDATE auth_sessions
                     SET refresh_token_hash = ?,
@@ -360,7 +384,8 @@ class AuthStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                cursor = connection.execute(
+                cursor = self._execute(
+                    connection,
                     """
                     UPDATE auth_sessions
                     SET revoked_at = ?
@@ -378,7 +403,8 @@ class AuthStoreService:
 
     def get_user(self, user_id: str) -> dict:
         with self._connect() as connection:
-            row = connection.execute(
+            row = self._execute(
+                connection,
                 """
                 SELECT
                     id,
@@ -405,7 +431,8 @@ class AuthStoreService:
 
     def _init_schema(self) -> None:
         with self._connect() as connection:
-            connection.execute(
+            self._execute(
+                connection,
                 """
                 CREATE TABLE IF NOT EXISTS auth_users (
                     id TEXT PRIMARY KEY,
@@ -419,13 +446,15 @@ class AuthStoreService:
                 )
                 """
             )
-            connection.execute(
+            self._execute(
+                connection,
                 """
                 CREATE INDEX IF NOT EXISTS idx_auth_users_email
                 ON auth_users(email)
                 """
             )
-            connection.execute(
+            self._execute(
+                connection,
                 """
                 CREATE TABLE IF NOT EXISTS auth_sessions (
                     id TEXT PRIMARY KEY,
@@ -439,13 +468,15 @@ class AuthStoreService:
                 )
                 """
             )
-            connection.execute(
+            self._execute(
+                connection,
                 """
                 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id
                 ON auth_sessions(user_id)
                 """
             )
-            connection.execute(
+            self._execute(
+                connection,
                 """
                 CREATE TABLE IF NOT EXISTS auth_login_attempts (
                     email TEXT PRIMARY KEY,
@@ -457,11 +488,14 @@ class AuthStoreService:
             )
             connection.commit()
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(str(self.db_path), check_same_thread=False)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+    def _connect(self) -> Any:
+        return psycopg.connect(self.database_url, row_factory=dict_row)
+
+    def _execute(self, connection: Any, query: str, params: tuple = ()) -> Any:
+        return connection.execute(self._sql(query), params)
+
+    def _sql(self, query: str) -> str:
+        return query.replace("?", "%s")
 
     @staticmethod
     def _utc_now() -> str:
@@ -524,8 +558,9 @@ class AuthStoreService:
                 error_code="INVALID_PASSWORD_POLICY",
             )
 
-    def _ensure_not_locked(self, connection: sqlite3.Connection, email: str, now: datetime) -> None:
-        row = connection.execute(
+    def _ensure_not_locked(self, connection: Any, email: str, now: datetime) -> None:
+        row = self._execute(
+            connection,
             "SELECT locked_until FROM auth_login_attempts WHERE email = ?",
             (email,),
         ).fetchone()
@@ -535,7 +570,7 @@ class AuthStoreService:
 
         locked_until = self._parse_datetime(row["locked_until"])
         if locked_until <= now:
-            connection.execute("DELETE FROM auth_login_attempts WHERE email = ?", (email,))
+            self._execute(connection, "DELETE FROM auth_login_attempts WHERE email = ?", (email,))
             return
 
         retry_minutes = max(1, int((locked_until - now).total_seconds() // 60) + 1)
@@ -547,11 +582,12 @@ class AuthStoreService:
 
     def _record_failed_attempt(
         self,
-        connection: sqlite3.Connection,
+        connection: Any,
         email: str,
         now: datetime,
     ) -> datetime | None:
-        existing = connection.execute(
+        existing = self._execute(
+            connection,
             """
             SELECT failed_attempts, last_failed_at, locked_until
             FROM auth_login_attempts
@@ -570,7 +606,8 @@ class AuthStoreService:
         if attempts >= self.max_failed_attempts:
             locked_until = now + timedelta(minutes=self.lockout_minutes)
 
-        connection.execute(
+        self._execute(
+            connection,
             """
             INSERT INTO auth_login_attempts (email, failed_attempts, last_failed_at, locked_until)
             VALUES (?, ?, ?, ?)

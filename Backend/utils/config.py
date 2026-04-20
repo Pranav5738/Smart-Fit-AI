@@ -15,14 +15,19 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
 
-    allowed_origins: List[str] = Field(default_factory=lambda: ["*"])
+    allowed_origins: List[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+    )
 
     default_user_height_cm: float = 170.0
     measurement_round_digits: int = 2
     consent_version: str = "v1"
     auto_delete_uploaded_images: bool = True
 
-    auth_token_secret: str = "smartfit-dev-secret-change-me"
+    auth_token_secret: str = Field(min_length=32)
     auth_access_token_minutes: int = Field(default=20, gt=0)
     auth_refresh_token_days: int = Field(default=14, gt=0)
     auth_max_failed_attempts: int = Field(default=5, gt=0)
@@ -32,7 +37,7 @@ class Settings(BaseSettings):
     model_path: Path = Field(default=BASE_DIR / "models" / "size_model.pkl")
     tryon_assets_dir: Path = Field(default=BASE_DIR / "static" / "clothing")
     catalog_path: Path = Field(default=BASE_DIR / "static" / "catalog" / "products.csv")
-    data_store_path: Path = Field(default=BASE_DIR / "model_artifacts" / "profile_store.db")
+    database_url: str = Field(min_length=1)
 
     model_config = SettingsConfigDict(
         env_file=".env",

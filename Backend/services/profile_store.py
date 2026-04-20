@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+import importlib
 import threading
 from datetime import datetime, timezone
-from pathlib import Path
+from typing import Any, Optional
 from uuid import uuid4
+
+try:
+    psycopg = importlib.import_module("psycopg")
+    dict_row = importlib.import_module("psycopg.rows").dict_row
+except ModuleNotFoundError:  # pragma: no cover - optional during local linting without dependencies
+    psycopg = None
+    dict_row = None
 
 from fastapi import status
 
@@ -13,12 +20,21 @@ from utils.exceptions import SmartFitError
 
 
 class ProfileStoreService:
-    """SQLite-backed storage for profiles, scan history, and trend exports."""
+    """Storage for profiles, scan history, and trend exports."""
 
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
+    def __init__(self, database_url: Optional[str]) -> None:
+        self.database_url = (database_url or "").strip()
         self._lock = threading.Lock()
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not self.database_url:
+            raise ValueError("DATABASE_URL must be set for PostgreSQL storage")
+
+        if not self.database_url.lower().startswith(("postgres://", "postgresql://")):
+            raise ValueError("DATABASE_URL must be a PostgreSQL URL")
+
+        if psycopg is None:
+            raise ValueError("psycopg is required for PostgreSQL storage")
+
         self._init_schema()
 
     def create_profile(self, name: str) -> dict:
@@ -35,7 +51,8 @@ class ProfileStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                connection.execute(
+                self._execute(
+                    connection,
                     "INSERT INTO profiles (id, name, created_at) VALUES (?, ?, ?)",
                     (profile_id, cleaned_name, now),
                 )
@@ -45,7 +62,8 @@ class ProfileStoreService:
 
     def list_profiles(self) -> list[dict]:
         with self._connect() as connection:
-            rows = connection.execute(
+            rows = self._execute(
+                connection,
                 """
                 SELECT
                     p.id,
@@ -64,7 +82,8 @@ class ProfileStoreService:
 
     def get_profile(self, profile_id: str) -> dict:
         with self._connect() as connection:
-            row = connection.execute(
+            row = self._execute(
+                connection,
                 """
                 SELECT
                     p.id,
@@ -102,7 +121,8 @@ class ProfileStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                connection.execute(
+                self._execute(
+                    connection,
                     "UPDATE profiles SET name = ? WHERE id = ?",
                     (cleaned_name, profile_id),
                 )
@@ -118,7 +138,8 @@ class ProfileStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                connection.execute(
+                self._execute(
+                    connection,
                     """
                     INSERT INTO scans (
                         id,
@@ -162,7 +183,8 @@ class ProfileStoreService:
         self.get_profile(profile_id)
 
         with self._connect() as connection:
-            rows = connection.execute(
+            rows = self._execute(
+                connection,
                 """
                 SELECT *
                 FROM scans
@@ -179,7 +201,8 @@ class ProfileStoreService:
         self.get_profile(profile_id)
 
         with self._connect() as connection:
-            row = connection.execute(
+            row = self._execute(
+                connection,
                 "SELECT * FROM scans WHERE profile_id = ? AND id = ?",
                 (profile_id, scan_id),
             ).fetchone()
@@ -235,7 +258,7 @@ class ProfileStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                connection.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
+                self._execute(connection, "DELETE FROM profiles WHERE id = ?", (profile_id,))
                 connection.commit()
 
     def delete_scan(self, profile_id: str, scan_id: str) -> None:
@@ -243,7 +266,8 @@ class ProfileStoreService:
 
         with self._lock:
             with self._connect() as connection:
-                cursor = connection.execute(
+                cursor = self._execute(
+                    connection,
                     "DELETE FROM scans WHERE profile_id = ? AND id = ?",
                     (profile_id, scan_id),
                 )
@@ -258,7 +282,8 @@ class ProfileStoreService:
 
     def _init_schema(self) -> None:
         with self._connect() as connection:
-            connection.execute(
+            self._execute(
+                connection,
                 """
                 CREATE TABLE IF NOT EXISTS profiles (
                     id TEXT PRIMARY KEY,
@@ -267,7 +292,8 @@ class ProfileStoreService:
                 )
                 """
             )
-            connection.execute(
+            self._execute(
+                connection,
                 """
                 CREATE TABLE IF NOT EXISTS scans (
                     id TEXT PRIMARY KEY,
@@ -290,14 +316,17 @@ class ProfileStoreService:
             )
             connection.commit()
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(str(self.db_path), check_same_thread=False)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+    def _connect(self) -> Any:
+        return psycopg.connect(self.database_url, row_factory=dict_row)
+
+    def _execute(self, connection: Any, query: str, params: tuple = ()) -> Any:
+        return connection.execute(self._sql(query), params)
+
+    def _sql(self, query: str) -> str:
+        return query.replace("?", "%s")
 
     @staticmethod
-    def _scan_row_to_dict(row: sqlite3.Row) -> dict:
+    def _scan_row_to_dict(row: Any) -> dict:
         return {
             "scan_id": row["id"],
             "profile_id": row["profile_id"],

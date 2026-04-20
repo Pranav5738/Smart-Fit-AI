@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from fastapi import APIRouter
 
 from models.schemas import OperationStatusResponse, PrivacyPolicyResponse, ProfileExportResponse
@@ -6,7 +8,11 @@ from utils.config import get_settings
 
 router = APIRouter(prefix="/privacy", tags=["Privacy"])
 settings = get_settings()
-profile_store = ProfileStoreService(db_path=settings.data_store_path)
+
+
+@lru_cache
+def _get_profile_store() -> ProfileStoreService:
+    return ProfileStoreService(database_url=settings.database_url)
 
 
 @router.get("/policy", response_model=PrivacyPolicyResponse)
@@ -24,12 +30,14 @@ def get_privacy_policy() -> PrivacyPolicyResponse:
 
 @router.get("/download-my-data/{profile_id}", response_model=ProfileExportResponse)
 def download_my_data(profile_id: str) -> ProfileExportResponse:
+    profile_store = _get_profile_store()
     payload = profile_store.export_profile(profile_id)
     return ProfileExportResponse(**payload)
 
 
 @router.delete("/delete-my-data/{profile_id}", response_model=OperationStatusResponse)
 def delete_my_data(profile_id: str) -> OperationStatusResponse:
+    profile_store = _get_profile_store()
     profile_store.delete_profile(profile_id)
     return OperationStatusResponse(
         status="deleted",

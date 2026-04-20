@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
+import os
+import importlib
 from typing import Iterator
 
 import pytest
@@ -16,11 +17,33 @@ from utils.exceptions import SmartFitError
 
 
 @pytest.fixture()
-def client(tmp_path: Path) -> Iterator[TestClient]:
-    db_path = tmp_path / "test_store.db"
+def client() -> Iterator[TestClient]:
+    test_database_url = os.getenv("TEST_DATABASE_URL")
+    if not test_database_url:
+        pytest.skip("TEST_DATABASE_URL is required to run backend API tests")
 
-    auth_routes.auth_store = AuthStoreService(
-        db_path=db_path,
+    try:
+        psycopg = importlib.import_module("psycopg")
+        with psycopg.connect(test_database_url, connect_timeout=2):
+            pass
+    except Exception:
+        pytest.skip("TEST_DATABASE_URL is unreachable")
+
+    with psycopg.connect(test_database_url, connect_timeout=2) as connection:
+        connection.execute(
+            """
+            TRUNCATE TABLE
+                auth_sessions,
+                auth_login_attempts,
+                auth_users,
+                scans,
+                profiles
+            """
+        )
+        connection.commit()
+
+    auth_store = AuthStoreService(
+        database_url=test_database_url,
         access_token_secret="test-token-secret",
         access_token_minutes=20,
         refresh_token_days=7,
@@ -28,7 +51,18 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
         lockout_minutes=10,
         attempt_window_minutes=15,
     )
-    profiles_routes.profile_store = ProfileStoreService(db_path=db_path)
+    profile_store = ProfileStoreService(database_url=test_database_url)
+    original_get_auth_store = auth_routes._get_auth_store
+    original_get_profile_store = profiles_routes._get_profile_store
+
+    if hasattr(original_get_auth_store, "cache_clear"):
+        original_get_auth_store.cache_clear()
+
+    if hasattr(original_get_profile_store, "cache_clear"):
+        original_get_profile_store.cache_clear()
+
+    auth_routes._get_auth_store = lambda: auth_store
+    profiles_routes._get_profile_store = lambda: profile_store
 
     app = FastAPI()
     app.include_router(auth_routes.router)
@@ -47,5 +81,15 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
             },
         )
 
-    with TestClient(app) as test_client:
-        yield test_client
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        auth_routes._get_auth_store = original_get_auth_store
+        profiles_routes._get_profile_store = original_get_profile_store
+
+        if hasattr(original_get_auth_store, "cache_clear"):
+            original_get_auth_store.cache_clear()
+
+        if hasattr(original_get_profile_store, "cache_clear"):
+            original_get_profile_store.cache_clear()
