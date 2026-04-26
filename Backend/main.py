@@ -31,6 +31,7 @@ logger = get_logger(__name__)
 
 default_fallback_origins = {
 	"https://smart-fit-ai-two.vercel.app",
+	"https://smart-fit-ai.onrender.com",
 	"http://localhost:5173",
 	"http://127.0.0.1:5173",
 }
